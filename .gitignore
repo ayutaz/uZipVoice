@@ -82,5 +82,4 @@ crashlytics-build.properties
 # uLoopMCP output
 .uloop/
 
-# espeak-ng data (download separately)
-Assets/StreamingAssets/espeak-ng-data/
+# espeak-ng data (English only included in repo)

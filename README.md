@@ -140,6 +140,22 @@ Waveform (24kHz)
 | `ISTFTProcessor` | Inverse STFT using NWaves library |
 | `FeatureExtractor` | Mel spectrogram extraction from audio |
 
+## Performance Optimization
+
+FMDecoder includes several optimizations for faster synthesis:
+
+| Optimization | Description |
+|-------------|-------------|
+| Buffer Reuse | Reuses `_xBuffer` across Euler steps to reduce memory allocation |
+| Reduced Yield | `UniTask.Yield()` called every 4 steps instead of every step |
+| TensorShape Cache | Caches TensorShape for reuse in Euler integration loop |
+
+### Performance Tips
+
+- **NumSteps**: Lower values (4-8) are faster but may reduce quality. Higher values (16-32) provide better quality.
+- **Backend**: Use `GPUCompute` for best performance on supported hardware.
+- **Batch Size**: Process single utterances for lowest latency.
+
 ## Configuration
 
 ### ZipVoiceConfig

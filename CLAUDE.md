@@ -148,13 +148,14 @@ STFT係数
 
 ### 完了
 - ✅ TextEncoder - テキストトークン→条件ベクトル変換
-- ✅ FMDecoder - Flow Matching ODE積分（非同期対応）
+- ✅ FMDecoder - Flow Matching ODE積分（非同期対応・最適化済み）
 - ✅ Vocos - メル特徴量→STFT係数変換
 - ✅ ISTFTProcessor - NWavesライブラリによるSTFT→波形変換
 - ✅ EspeakTokenizer - テキスト→トークン変換
 - ✅ ZipVoiceManager - 統合API
 - ✅ UniTask対応 - UIフリーズ防止
 - ✅ NWaves導入 - 高精度ISTFT実装
+- ✅ パフォーマンス最適化 - バッファ再利用、Yield頻度削減
 
 ### テンソル形状の重要な注意点
 
@@ -174,11 +175,39 @@ ONNXモデルの入力形状には注意が必要です:
 UniTaskを使用してUIフリーズを防止しています:
 
 ```csharp
-// FMDecoderのEulerループ内で毎ステップyield
-await UniTask.Yield();
+// FMDecoderのEulerループ内で4ステップごとにyield（高速化のため頻度削減）
+if (step % 4 == 0)
+{
+    await UniTask.Yield();
+}
 
 // 進捗コールバック
 onProgress?.Invoke((float)(step + 1) / solver.NumSteps);
+```
+
+### パフォーマンス最適化
+
+FMDecoderには以下の最適化が実装されています:
+
+1. **バッファ再利用**: `_xBuffer`をEulerステップ間で再利用し、メモリアロケーションを削減
+2. **Yield頻度削減**: `UniTask.Yield()`を毎ステップから4ステップごとに変更
+3. **TensorShapeキャッシュ**: Euler積分ループでTensorShapeを再利用
+
+```csharp
+// バッファ再利用の例
+if (_xBuffer == null || _xBuffer.Length != totalSize)
+{
+    _xBuffer = new float[totalSize];
+}
+
+// CPU上でEulerステップを実行してバッファに格納
+for (int i = 0; i < totalSize; i++)
+{
+    _xBuffer[i] = xData[i] + dt * vData[i];
+}
+
+// バッファからテンソルを作成（1回のアップロード）
+x = new Tensor<float>(shape, _xBuffer);
 ```
 
 ## Unity Sentis参考

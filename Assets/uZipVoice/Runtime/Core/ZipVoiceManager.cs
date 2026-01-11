@@ -1,6 +1,6 @@
 using System;
 using System.IO;
-using System.Threading.Tasks;
+using Cysharp.Threading.Tasks;
 using Unity.InferenceEngine;
 using UnityEngine;
 using uZipVoice.Audio;
@@ -62,7 +62,7 @@ namespace uZipVoice.Core
         /// <summary>
         /// 初期化
         /// </summary>
-        public async Task InitializeAsync()
+        public async UniTask InitializeAsync()
         {
             if (_isInitialized)
             {
@@ -151,7 +151,7 @@ namespace uZipVoice.Core
                 _isInitialized = true;
                 Debug.Log("[ZipVoiceManager] Initialization complete");
 
-                await Task.CompletedTask;
+                await UniTask.CompletedTask;
             }
             catch (Exception ex)
             {
@@ -168,7 +168,7 @@ namespace uZipVoice.Core
         /// <param name="promptText">プロンプトテキスト</param>
         /// <param name="options">合成オプション（nullの場合はデフォルト）</param>
         /// <returns>生成されたAudioClip</returns>
-        public async Task<AudioClip> SynthesizeAsync(
+        public async UniTask<AudioClip> SynthesizeAsync(
             string text,
             AudioClip promptAudio,
             string promptText,
@@ -211,13 +211,26 @@ namespace uZipVoice.Core
                     promptMel = _featureExtractor.ExtractMelSpectrogram(promptAudio);
                     promptFeaturesLen = promptMel.GetLength(0);
                 }
+                else
+                {
+                    // プロンプト音声がない場合、デフォルトの出力長を計算
+                    // TextEncoderの計算式: features_len = (prompt_features_len / prompt_tokens_len * tokens_len / speed)
+                    // デフォルトでは1トークンあたり約10フレーム（約100ms）と仮定
+                    int defaultFramesPerToken = 10;
+                    promptFeaturesLen = promptTokens.Length * defaultFramesPerToken;
+                    Debug.Log($"[ZipVoiceManager] No prompt audio. Using estimated promptFeaturesLen={promptFeaturesLen}");
+                }
 
                 // 3. TextEncoderで条件ベクトルを生成
+                Debug.Log("[ZipVoiceManager] Running TextEncoder...");
                 using var textCondition = _textEncoder.Execute(tokens, promptTokens, promptFeaturesLen, speed);
+                Debug.Log($"[ZipVoiceManager] textCondition shape: [{textCondition.shape[0]}, {textCondition.shape[1]}, {textCondition.shape[2]}]");
+                await UniTask.Yield(); // UIスレッドに制御を戻す
 
                 // 4. 音声条件を作成（プロンプトメル特徴量から）
                 int seqLen = textCondition.shape[1];
-                int featDim = 100;
+                int featDim = textCondition.shape[2]; // TextEncoderの出力次元に合わせる
+                Debug.Log($"[ZipVoiceManager] Using seqLen={seqLen}, featDim={featDim}");
                 float[] speechCondData = new float[1 * seqLen * featDim];
 
                 if (promptMel != null)
@@ -243,15 +256,21 @@ namespace uZipVoice.Core
 
                 // textConditionを [1, T, 512] → [1, T, 100] に変換する必要がある
                 // 実際のモデルの仕様に合わせて調整が必要
-                using var melFeatures = _fmDecoder.Generate(solver, textCondition, speechCondition, guidanceScale);
+                using var melFeatures = await _fmDecoder.GenerateAsync(
+                    solver, textCondition, speechCondition, guidanceScale,
+                    progress => Debug.Log($"[ZipVoiceManager] FM Decoder progress: {progress * 100:F0}%")
+                );
 
                 // 6. メル特徴量を転置 [1, T, 100] → [1, 100, T]
                 using var melTransposed = Vocos.TransposeMelFeatures(melFeatures);
 
                 // 7. Vocosでメル→STFT係数
+                Debug.Log("[ZipVoiceManager] Running Vocos...");
                 using var vocosOutput = _vocos.Execute(melTransposed);
+                await UniTask.Yield(); // UIスレッドに制御を戻す
 
                 // 8. ISTFTで波形に変換
+                Debug.Log("[ZipVoiceManager] Running ISTFT...");
                 int numBins = vocosOutput.Magnitude.shape[1];
                 int numFrames = vocosOutput.Magnitude.shape[2];
 

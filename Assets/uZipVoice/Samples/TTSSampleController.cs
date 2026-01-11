@@ -1,4 +1,5 @@
 using System;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
@@ -42,7 +43,7 @@ namespace uZipVoice.Samples
         private void Start()
         {
             SetupUI();
-            InitializeAsync();
+            InitializeAsync().Forget();
         }
 
         private void SetupUI()
@@ -50,7 +51,7 @@ namespace uZipVoice.Samples
             // ボタンイベント
             if (_synthesizeButton != null)
             {
-                _synthesizeButton.onClick.AddListener(OnSynthesizeClicked);
+                _synthesizeButton.onClick.AddListener(() => OnSynthesizeClickedAsync().Forget());
                 _synthesizeButton.interactable = false;
             }
 
@@ -109,7 +110,7 @@ namespace uZipVoice.Samples
             UpdateStatus("Initializing...");
         }
 
-        private async void InitializeAsync()
+        private async UniTask InitializeAsync()
         {
             try
             {
@@ -136,7 +137,7 @@ namespace uZipVoice.Samples
             }
         }
 
-        private async void OnSynthesizeClicked()
+        private async UniTask OnSynthesizeClickedAsync()
         {
             if (!_isInitialized || _zipVoiceManager.IsProcessing)
             {

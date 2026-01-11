@@ -3,7 +3,8 @@
     "rootNamespace": "uZipVoice.Samples",
     "references": [
         "uZipVoice.Runtime",
-        "Unity.TextMeshPro"
+        "Unity.TextMeshPro",
+        "UniTask"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

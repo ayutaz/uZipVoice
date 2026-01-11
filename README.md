@@ -13,6 +13,7 @@ Unity implementation of [ZipVoice](https://github.com/Zengyi-Qin/ZipVoice) - a l
 
 - Unity 6 (6000.0.38f1 or later)
 - Unity AI Inference Engine 2.4.1+
+- UniTask 2.5.10+
 - espeak-ng data files (included in StreamingAssets)
 
 ## Installation
@@ -29,8 +30,9 @@ Open the project with Unity 6.
 
 ### 3. Install Dependencies
 
-The following packages will be installed automatically:
-- `com.unity.ai.inference` (2.4.1)
+The following packages will be installed automatically via OpenUPM:
+- `com.unity.ai.inference` (2.4.1) - Unity AI Inference Engine
+- `com.cysharp.unitask` (2.5.10) - Async/await support for Unity
 - TextMesh Pro
 
 ### 4. Setup ONNX Models
@@ -56,14 +58,13 @@ Assets/StreamingAssets/espeak-ng-data/
 ### Using the Sample Scene
 
 1. Open the sample scene: `Assets/uZipVoice/Samples/TTSSample.unity`
-2. Or create a new sample scene via menu: `uZipVoice > Create TTS Sample Scene`
-3. Assign ONNX models to `ZipVoiceManager` component
-4. Assign `tokens.txt` from `Assets/uZipVoice/Resources/`
-5. Enter Play mode and test TTS
+2. ONNX models and tokens.txt are pre-configured in the ZipVoiceManager component
+3. Enter Play mode and test TTS
 
 ### Programmatic Usage
 
 ```csharp
+using Cysharp.Threading.Tasks;
 using uZipVoice.Core;
 using UnityEngine;
 
@@ -71,9 +72,14 @@ public class TTSExample : MonoBehaviour
 {
     public ZipVoiceManager zipVoice;
     public AudioSource audioSource;
-    public AudioClip promptAudio; // Reference voice
+    public AudioClip promptAudio; // Reference voice (optional)
 
-    async void Start()
+    void Start()
+    {
+        InitializeAndSynthesize().Forget();
+    }
+
+    async UniTask InitializeAndSynthesize()
     {
         await zipVoice.InitializeAsync();
 
@@ -84,6 +90,7 @@ public class TTSExample : MonoBehaviour
             GuidanceScale = 1.0f
         };
 
+        // promptAudio can be null for default voice estimation
         AudioClip clip = await zipVoice.SynthesizeAsync(
             "Hello, this is a test.",
             promptAudio,
@@ -169,13 +176,19 @@ Assets/uZipVoice/
 │       ├── EspeakTokenizer.cs
 │       ├── ITokenizer.cs
 │       └── TokenMap.cs
-├── Editor/
-│   └── TTSSampleSceneCreator.cs
 ├── Samples/
 │   ├── TTSSample.unity
 │   └── TTSSampleController.cs
+├── Tests/
+│   ├── Editor/
+│   │   ├── EulerSolverTests.cs
+│   │   ├── TokenMapTests.cs
+│   │   └── EspeakTokenizerTests.cs
+│   └── Runtime/
 ├── Models/
-│   └── (ONNX models)
+│   ├── text_encoder.onnx
+│   ├── fm_decoder.onnx
+│   └── vocos_opset15.onnx
 ├── Plugins/
 │   └── Windows/x64/
 │       └── libespeak-ng.dll
@@ -185,13 +198,14 @@ Assets/uZipVoice/
 
 ## Testing
 
-The project includes 75 unit tests:
+The project includes 97 unit tests:
 
 | Test Class | Tests | Description |
 |------------|-------|-------------|
 | TokenMapTests | 24 | Token mapping validation |
 | EulerSolverTests | 32 | ODE solver validation |
 | EspeakTokenizerTests | 19 | G2P conversion tests |
+| TensorShapeTests | 22 | ONNX tensor shape validation |
 
 Run tests via Unity Test Runner (Window > General > Test Runner).
 

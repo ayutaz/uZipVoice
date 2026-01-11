@@ -74,27 +74,28 @@ namespace uZipVoice.Inference
                 throw new ArgumentException("Prompt tokens cannot be null or empty", nameof(promptTokens));
             }
 
-            // INT64テンソルを作成
-            long[] tokensLong = Array.ConvertAll(tokens, x => (long)x);
-            long[] promptTokensLong = Array.ConvertAll(promptTokens, x => (long)x);
+            Debug.Log($"[TextEncoder] tokens.Length={tokens.Length}, promptTokens.Length={promptTokens.Length}, promptFeaturesLen={promptFeaturesLen}");
 
-            using var tokensTensor = new Tensor<long>(
+            // INT32テンソルを作成（Sentisの推奨形式）
+            // Note: ONNXはint64を期待するが、SentisはTensor<int>をint64として扱う
+            using var tokensTensor = new Tensor<int>(
                 new TensorShape(1, tokens.Length),
-                tokensLong
+                tokens
             );
 
-            using var promptTokensTensor = new Tensor<long>(
+            using var promptTokensTensor = new Tensor<int>(
                 new TensorShape(1, promptTokens.Length),
-                promptTokensLong
+                promptTokens
             );
 
-            using var promptFeaturesLenTensor = new Tensor<long>(
-                new TensorShape(1),
-                new long[] { promptFeaturesLen }
+            // スカラーテンソル（rank 0）として作成
+            using var promptFeaturesLenTensor = new Tensor<int>(
+                new TensorShape(),
+                new int[] { promptFeaturesLen }
             );
 
             using var speedTensor = new Tensor<float>(
-                new TensorShape(1),
+                new TensorShape(),
                 new float[] { speed }
             );
 

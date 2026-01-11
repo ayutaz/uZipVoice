@@ -2069,9 +2069,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e852aeacb2bac4d45bc1e826eefe3411, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  TextEncoderModel: {fileID: 0}
-  FMDecoderModel: {fileID: 0}
-  VocosModel: {fileID: 0}
+  TextEncoderModel: {fileID: 5022602860645237092, guid: 49b452f07c0089c47be81bfa7df749b2, type: 3}
+  FMDecoderModel: {fileID: 5022602860645237092, guid: 5aa66727458a23e4389ac274907f30a2, type: 3}
+  VocosModel: {fileID: 5022602860645237092, guid: 44884284599ad5f469e534acb25e94c0, type: 3}
   TokensAsset: {fileID: 4900000, guid: 10081b84b4cfddc47aaf03893f9bff71, type: 3}
   Config: {fileID: 0}
   Backend: 256

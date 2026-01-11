@@ -1,4 +1,5 @@
 using System;
+using Cysharp.Threading.Tasks;
 using Unity.InferenceEngine;
 using UnityEngine;
 
@@ -82,8 +83,9 @@ namespace uZipVoice.Inference
                 throw new ArgumentNullException(nameof(speechCondition));
             }
 
-            using var tTensor = new Tensor<float>(new TensorShape(1), new float[] { t });
-            using var guidanceScaleTensor = new Tensor<float>(new TensorShape(1), new float[] { guidanceScale });
+            // スカラーテンソル（rank 0）として作成（ONNXモデルの期待形式）
+            using var tTensor = new Tensor<float>(new TensorShape(), new float[] { t });
+            using var guidanceScaleTensor = new Tensor<float>(new TensorShape(), new float[] { guidanceScale });
 
             // 入力を設定
             _worker.SetInput("t", tTensor);
@@ -101,18 +103,20 @@ namespace uZipVoice.Inference
         }
 
         /// <summary>
-        /// EulerSolverを使用して全ステップの積分を実行
+        /// EulerSolverを使用して全ステップの積分を実行（非同期版）
         /// </summary>
         /// <param name="solver">EulerSolver</param>
         /// <param name="textCondition">テキスト条件 [1, T, 100]</param>
         /// <param name="speechCondition">音声条件 [1, T, 100]</param>
         /// <param name="guidanceScale">CFGスケール</param>
+        /// <param name="onProgress">進捗コールバック (0.0-1.0)</param>
         /// <returns>最終的なメル特徴量 [1, T, 100]</returns>
-        public Tensor<float> Generate(
+        public async UniTask<Tensor<float>> GenerateAsync(
             EulerSolver solver,
             Tensor<float> textCondition,
             Tensor<float> speechCondition,
-            float guidanceScale = 1.0f)
+            float guidanceScale = 1.0f,
+            Action<float> onProgress = null)
         {
             ThrowIfNotLoaded();
 
@@ -167,6 +171,12 @@ namespace uZipVoice.Inference
                     new TensorShape(batchSize, seqLen, featDim),
                     xData
                 );
+
+                // 進捗を報告
+                onProgress?.Invoke((float)(step + 1) / solver.NumSteps);
+
+                // UIスレッドに制御を戻す（フリーズ防止）
+                await UniTask.Yield();
             }
 
             return x;

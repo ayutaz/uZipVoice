@@ -80,7 +80,25 @@ uv run python -m zipvoice.bin.verify_sentis_onnx \
 
 - **Opset version**: 7-15（15推奨）
 - **テンソル次元**: 最大8次元
-- **未サポート演算子**: `Log1p`, `FFT`, `IFFT`, `RFFT`, `IRFFT`
+- **未サポート演算子**:
+  - `If` - 条件分岐（静的グラフに変換が必要）
+  - `Log1p` - `log(1+x)`で代替
+  - `FFT`, `IFFT`, `RFFT`, `IRFFT` - 信号処理系
+
+### If演算子の回避
+
+ZipVoiceの`CompactRelPositionalEncoding`クラスでは、位置エンコーディングの動的拡張に条件分岐を使用していました。これはONNXの`If`ノードに変換され、Sentisでエラーになります。
+
+**解決策**: `torch.jit.is_tracing()`を使用して、ONNX export時は事前計算済みの位置エンコーディングを使用するように修正しました。
+
+```python
+# zipformer.py - CompactRelPositionalEncoding.forward()
+if torch.jit.is_scripting() or torch.jit.is_tracing():
+    pe = self.pe.to(dtype=x.dtype, device=x.device)  # 事前計算済みを使用
+else:
+    self.extend_pe(x, left_context_len)  # 動的拡張
+    pe = self.pe
+```
 
 ## モデルパラメータ（参考）
 
@@ -117,6 +135,42 @@ Audio:
 STFT係数
   ↓ ISTFT (C#実装)
 波形 (24kHz)
+```
+
+## 実装状況
+
+### 完了
+- ✅ TextEncoder - テキストトークン→条件ベクトル変換
+- ✅ FMDecoder - Flow Matching ODE積分（非同期対応）
+- ✅ Vocos - メル特徴量→STFT係数変換
+- ✅ ISTFTProcessor - STFT→波形変換
+- ✅ EspeakTokenizer - テキスト→トークン変換
+- ✅ ZipVoiceManager - 統合API
+- ✅ UniTask対応 - UIフリーズ防止
+
+### テンソル形状の重要な注意点
+
+ONNXモデルの入力形状には注意が必要です:
+
+| 入力 | 正しい形状 | 誤った形状 |
+|------|-----------|-----------|
+| `prompt_features_len` | `TensorShape()` (rank 0, scalar) | `TensorShape(1)` (rank 1) |
+| `speed` | `TensorShape()` (rank 0, scalar) | `TensorShape(1)` (rank 1) |
+| `t` | `TensorShape()` (rank 0, scalar) | `TensorShape(1)` (rank 1) |
+| `guidance_scale` | `TensorShape()` (rank 0, scalar) | `TensorShape(1)` (rank 1) |
+
+スカラー値は `new Tensor<float>(new TensorShape(), new float[] { value })` で作成します。
+
+### 非同期処理
+
+UniTaskを使用してUIフリーズを防止しています:
+
+```csharp
+// FMDecoderのEulerループ内で毎ステップyield
+await UniTask.Yield();
+
+// 進捗コールバック
+onProgress?.Invoke((float)(step + 1) / solver.NumSteps);
 ```
 
 ## Unity Sentis参考

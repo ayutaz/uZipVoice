@@ -2,7 +2,8 @@
     "name": "uZipVoice.Runtime",
     "rootNamespace": "uZipVoice",
     "references": [
-        "Unity.InferenceEngine"
+        "Unity.InferenceEngine",
+        "UniTask"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

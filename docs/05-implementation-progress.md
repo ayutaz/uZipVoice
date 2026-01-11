@@ -8,8 +8,8 @@ uZipVoiceプロジェクトの実装進捗を記録するドキュメントで�
 
 | カテゴリ | 完了 | 残り | 進捗率 |
 |---------|-----|------|--------|
-| コアコンポーネント | 2 | 9 | 18% |
-| テスト | 56 | - | 100% (実装済み分) |
+| コアコンポーネント | 10 | 1 | 91% |
+| テスト | 75 | - | 100% (実装済み分) |
 
 ---
 
@@ -21,13 +21,26 @@ uZipVoiceプロジェクトの実装進捗を記録するドキュメントで�
 
 音素からトークンIDへのマッピングを管理するクラス。
 
-**機能**:
-- tokens.txtファイルからのマッピング読み込み
-- TextAssetからの読み込み
-- 音素 ⇔ トークンID の双方向変換
-- 特殊トークン（PAD, BOS, EOS, SPACE）のサポート
-
 **テスト**: 24テストケース、全て成功
+
+---
+
+### ITokenizer + EspeakTokenizer（Tokenizer）
+
+**ファイル**:
+- `Assets/uZipVoice/Runtime/Tokenizer/ITokenizer.cs`
+- `Assets/uZipVoice/Runtime/Tokenizer/EspeakNative.cs`
+- `Assets/uZipVoice/Runtime/Tokenizer/EspeakTokenizer.cs`
+
+espeak-ngを使用したG2P（Grapheme-to-Phoneme）変換。
+
+**機能**:
+- ITokenizerインターフェース定義
+- espeak-ng P/Invokeラッパー
+- テキスト→IPA音素→トークンID変換
+- 複数言語対応（en-us, en-gbなど）
+
+**テスト**: 19テストケース、全て成功
 
 ---
 
@@ -37,40 +50,103 @@ uZipVoiceプロジェクトの実装進捗を記録するドキュメントで�
 
 Flow MatchingのためのEuler ODE積分ソルバー。
 
-**機能**:
-- 非線形タイムステップ生成（t_shift パラメータ対応）
-- 単一ステップ計算
-- インプレース更新オプション
-- パラメータ検証
-
 **テスト**: 32テストケース、全て成功
+
+---
+
+### TextEncoder（Inference）
+
+**ファイル**: `Assets/uZipVoice/Runtime/Inference/TextEncoder.cs`
+
+テキストトークンを条件ベクトルに変換するONNX推論ラッパー。
+
+**機能**:
+- Unity AI Inference Engine 2.3対応
+- GPU/CPUバックエンド選択可能
+- 入力: tokens, prompt_tokens, prompt_features_len, speed
+- 出力: text_condition [1, T, 512]
+
+---
+
+### FMDecoder（Inference）
+
+**ファイル**: `Assets/uZipVoice/Runtime/Inference/FMDecoder.cs`
+
+Flow Matchingデコーダ。EulerSolverと統合してメル特徴量を生成。
+
+**機能**:
+- 単一ステップ推論
+- EulerSolverを使用した全ステップ積分
+- CFG (Classifier-Free Guidance)対応
+
+---
+
+### Vocos（Inference）
+
+**ファイル**: `Assets/uZipVoice/Runtime/Inference/Vocos.cs`
+
+Vocoder。メルスペクトログラムからSTFT係数を生成。
+
+**機能**:
+- メル特徴量→STFT係数変換
+- 出力: magnitude, phase_cos, phase_sin
+
+---
+
+### ISTFTProcessor（Audio）
+
+**ファイル**: `Assets/uZipVoice/Runtime/Audio/ISTFTProcessor.cs`
+
+逆短時間フーリエ変換。STFT係数から波形を生成。
+
+**機能**:
+- Hannウィンドウ
+- オーバーラップ加算
+- カスタムIFFT実装
+
+---
+
+### FeatureExtractor（Audio）
+
+**ファイル**: `Assets/uZipVoice/Runtime/Audio/FeatureExtractor.cs`
+
+音声波形からメルスペクトログラムを抽出。
+
+**機能**:
+- STFT計算
+- メルフィルターバンク適用
+- リサンプリング対応
+- AudioClipからの直接抽出
+
+---
+
+### ZipVoiceConfig（Core）
+
+**ファイル**: `Assets/uZipVoice/Runtime/Core/ZipVoiceConfig.cs`
+
+設定管理用ScriptableObject。
+
+---
+
+### ZipVoiceManager（Core）
+
+**ファイル**: `Assets/uZipVoice/Runtime/Core/ZipVoiceManager.cs`
+
+メインAPI。すべてのコンポーネントを統合。
+
+**機能**:
+- 非同期初期化
+- 音声合成（テキスト→AudioClip）
+- プロンプト音声による声質制御
+- 合成オプション（ステップ数、速度、CFGスケール）
 
 ---
 
 ## 3. 未実装コンポーネント
 
-### 優先度: 高
-
-| コンポーネント | 説明 | 依存関係 |
-|--------------|------|---------|
-| EspeakTokenizer | espeak-ngを使用したG2P変換 | espeak-ng DLL |
-| TextEncoder | テキスト→条件ベクトル推論 | Inference Engine |
-| FMDecoder | Flow Matchingデコーダ推論 | EulerSolver |
-
-### 優先度: 中
-
-| コンポーネント | 説明 | 依存関係 |
-|--------------|------|---------|
-| Vocos | Vocoder推論 | Inference Engine |
-| ISTFTProcessor | ISTFT音声生成 | NWaves |
-| FeatureExtractor | メル特徴抽出 | - |
-
-### 優先度: 低
-
-| コンポーネント | 説明 | 依存関係 |
-|--------------|------|---------|
-| ZipVoiceManager | メインAPI | 全コンポーネント |
-| サンプル | デモシーン | ZipVoiceManager |
+| コンポーネント | 説明 | 優先度 |
+|--------------|------|--------|
+| サンプルシーン | デモシーン・UIサンプル | 中 |
 
 ---
 
@@ -82,20 +158,8 @@ Flow MatchingのためのEuler ODE積分ソルバー。
 |------------|---------|------|
 | TokenMapTests | 24 | ✅ 全成功 |
 | EulerSolverTests | 32 | ✅ 全成功 |
-| **合計** | **56** | **✅ 全成功** |
-
-### 未実装テスト
-
-| テストクラス | 予定テスト数 | 対象コンポーネント |
-|------------|-------------|------------------|
-| EspeakTokenizerTests | 12 | EspeakTokenizer |
-| ISTFTProcessorTests | 10 | ISTFTProcessor |
-| TextEncoderTests | 9 | TextEncoder |
-| FMDecoderTests | 9 | FMDecoder |
-| VocosTests | 8 | Vocos |
-| FeatureExtractorTests | 7 | FeatureExtractor |
-| IntegrationTests | 6 | 統合テスト |
-| ZipVoiceManagerTests | 10 | ZipVoiceManager |
+| EspeakTokenizerTests | 19 | ✅ 全成功 |
+| **合計** | **75** | **✅ 全成功** |
 
 ---
 
@@ -103,6 +167,10 @@ Flow MatchingのためのEuler ODE積分ソルバー。
 
 | 日付 | コミット | 内容 |
 |------|---------|------|
+| 2026-01-11 | 432ec64 | Add core TTS pipeline components |
+| 2026-01-11 | 5b715c0 | Add espeak-ng native plugin for Windows |
+| 2026-01-11 | f719280 | Add ITokenizer interface and EspeakTokenizer |
+| 2026-01-11 | 6020eb1 | Update documentation with implementation progress |
 | 2026-01-11 | eff6dce | Add Microsoft.CodeAnalysis.CSharp via OpenUPM |
 | 2026-01-11 | 2e7bf51 | Add TokenMap, EulerSolver with unit tests |
 | 2026-01-11 | a20c8a0 | Add test specification document |
@@ -115,26 +183,32 @@ Flow MatchingのためのEuler ODE積分ソルバー。
 
 ## 6. 次のステップ
 
-1. **EspeakTokenizer実装**
-   - piper-unityを参考にP/Invokeラッパー作成
-   - espeak-ng DLLの配置
-   - espeak-ng-dataの配置
+1. **サンプルシーン作成**
+   - TTSSample.unity シーン
+   - UIコントローラー
+   - 使用方法のデモ
 
-2. **TextEncoder実装**
-   - Unity AI Inference Engine 2.3でONNXモデル読み込み
-   - 入出力テンソル処理
+2. **E2Eテスト**
+   - 実際のONNXモデルを使用した統合テスト
+   - 音声品質の確認
 
-3. **FMDecoder + Vocos実装**
-   - EulerSolverを使用した積分ループ
-   - ONNX推論パイプライン
-
-4. **ISTFTProcessor実装**
-   - NWavesライブラリ導入
-   - STFT係数から波形への変換
+3. **最適化**
+   - FFT/IFFTの最適化（NWaves導入検討）
+   - メモリ使用量の最適化
 
 ---
 
 ## 7. 技術的メモ
+
+### espeak-ng セットアップ
+
+1. `libespeak-ng.dll` を `Assets/uZipVoice/Plugins/Windows/x64/` に配置
+2. `espeak-ng-data/` を `Assets/StreamingAssets/` に配置
+
+espeak-ngインストール済みの場合:
+```
+C:\Program Files\eSpeak NG\espeak-ng-data → Assets\StreamingAssets\espeak-ng-data
+```
 
 ### OpenUPMスコープレジストリ
 
@@ -151,10 +225,6 @@ uLoopMCPでテスト実行するために必要:
   ]
 }
 ```
-
-### テスト実行コマンド
-
-Unity Test Runnerまたはuloopメcp経由で実行可能。
 
 ---
 

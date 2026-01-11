@@ -8,7 +8,7 @@ uZipVoiceプロジェクトの実装進捗を記録するドキュメントで�
 
 | カテゴリ | 完了 | 残り | 進捗率 |
 |---------|-----|------|--------|
-| コアコンポーネント | 10 | 1 | 91% |
+| コアコンポーネント | 11 | 0 | 100% |
 | テスト | 75 | - | 100% (実装済み分) |
 
 ---
@@ -142,11 +142,32 @@ Vocoder。メルスペクトログラムからSTFT係数を生成。
 
 ---
 
+### TTSSampleController（Samples）
+
+**ファイル**:
+- `Assets/uZipVoice/Samples/TTSSampleController.cs`
+- `Assets/uZipVoice/Samples/TTSSample.unity`
+- `Assets/uZipVoice/Editor/TTSSampleSceneCreator.cs`
+
+TTSデモ用UIコントローラーとサンプルシーン。
+
+**機能**:
+- テキスト入力フィールド
+- プロンプトテキスト入力
+- パラメータ調整（ステップ数、速度、ガイダンス）
+- 再生/停止コントロール
+- ステータス表示
+
+**使用方法**:
+1. メニュー `uZipVoice > Create TTS Sample Scene` でシーン作成
+2. ZipVoiceManagerにONNXモデルとtokens.txtを設定
+3. Play モードで実行
+
+---
+
 ## 3. 未実装コンポーネント
 
-| コンポーネント | 説明 | 優先度 |
-|--------------|------|--------|
-| サンプルシーン | デモシーン・UIサンプル | 中 |
+なし（全コンポーネント実装完了）
 
 ---
 
@@ -167,6 +188,8 @@ Vocoder。メルスペクトログラムからSTFT係数を生成。
 
 | 日付 | コミット | 内容 |
 |------|---------|------|
+| 2026-01-11 | ff656e2 | Add TTS sample scene and UI controller |
+| 2026-01-11 | 47a4e50 | Update documentation with AI Inference Engine info |
 | 2026-01-11 | 2248a46 | Add Unity AI Inference Engine package |
 | 2026-01-11 | f700375 | Update implementation progress documentation |
 | 2026-01-11 | 432ec64 | Add core TTS pipeline components |
@@ -185,16 +208,20 @@ Vocoder。メルスペクトログラムからSTFT係数を生成。
 
 ## 6. 次のステップ
 
-1. **サンプルシーン作成**
+1. ~~**サンプルシーン作成**~~ ✅ 完了
    - TTSSample.unity シーン
    - UIコントローラー
-   - 使用方法のデモ
 
-2. **E2Eテスト**
+2. **ONNXモデル設定**
+   - ZipVoiceからONNXモデルをエクスポート
+   - ZipVoiceManagerにモデルを設定
+   - tokens.txtを設定
+
+3. **E2Eテスト**
    - 実際のONNXモデルを使用した統合テスト
    - 音声品質の確認
 
-3. **最適化**
+4. **最適化（オプション）**
    - FFT/IFFTの最適化（NWaves導入検討）
    - メモリ使用量の最適化
 

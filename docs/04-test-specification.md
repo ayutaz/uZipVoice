@@ -365,10 +365,31 @@ public class MockTextEncoder
 
 ### 必要条件
 
-- Unity 6000.0.50f1以上
+- Unity 6000.0.58f2以上
 - Unity AI Inference Engine 2.3
-- espeak-ng-data (StreamingAssets)
-- ONNXモデルファイル
+- Microsoft.CodeAnalysis.CSharp 4.14.0（OpenUPM経由）
+- espeak-ng-data (StreamingAssets) ※EspeakTokenizerテスト用
+- ONNXモデルファイル ※推論テスト用
+
+### パッケージ設定
+
+**Packages/manifest.json（抜粋）**
+```json
+{
+  "scopedRegistries": [
+    {
+      "name": "OpenUPM",
+      "url": "https://package.openupm.com",
+      "scopes": ["org.nuget"]
+    }
+  ],
+  "dependencies": {
+    "org.nuget.microsoft.codeanalysis.csharp": "4.14.0",
+    "com.unity.test-framework": "1.5.1",
+    ...
+  }
+}
+```
 
 ### Assembly Definition
 
@@ -379,14 +400,21 @@ public class MockTextEncoder
     "rootNamespace": "uZipVoice.Tests",
     "references": [
         "uZipVoice.Runtime",
-        "Unity.InferenceEngine",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner"
     ],
     "includePlatforms": ["Editor"],
-    "optionalUnityReferences": ["TestAssemblies"]
+    "overrideReferences": true,
+    "precompiledReferences": ["nunit.framework.dll"],
+    "defineConstraints": ["UNITY_INCLUDE_TESTS"]
 }
 ```
+
+### テスト実行結果（最新）
+
+| 日付 | テスト総数 | 成功 | 失敗 | スキップ |
+|------|-----------|------|------|---------|
+| 2026-01-11 | 56 | 56 | 0 | 0 |
 
 ---
 

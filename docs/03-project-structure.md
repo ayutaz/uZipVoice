@@ -64,10 +64,21 @@ uZipVoice/
 │           └── Audio/
 │               └── prompt.wav              # サンプルプロンプト音声
 │
+├── Tests/                              # テスト
+│           ├── Editor/
+│           │   ├── uZipVoice.Tests.Editor.asmdef
+│           │   ├── TestUtility.cs
+│           │   ├── TokenMapTests.cs
+│           │   └── EulerSolverTests.cs
+│           └── Runtime/
+│               └── uZipVoice.Tests.Runtime.asmdef
+│
 ├── docs/                                # ドキュメント
 │   ├── 01-research.md
 │   ├── 02-architecture.md
-│   └── 03-project-structure.md
+│   ├── 03-project-structure.md
+│   ├── 04-test-specification.md
+│   └── 05-implementation-progress.md
 │
 ├── Packages/
 │   └── manifest.json
@@ -135,20 +146,67 @@ public interface ITokenizer
 }
 ```
 
-### EulerSolver
+### EulerSolver（実装済み）
 
 ```csharp
-public class EulerSolver
+namespace uZipVoice.Inference
 {
-    public EulerSolver(int numSteps, float tShift = 0.5f);
+    public class EulerSolver
+    {
+        // プロパティ
+        public int NumSteps { get; }
+        public float TShift { get; }
+        public float TStart { get; }
+        public float TEnd { get; }
 
-    public float[] GetTimesteps();
+        // コンストラクタ
+        public EulerSolver(int numSteps, float tShift = 0.5f, float tStart = 0f, float tEnd = 1f);
 
-    public Tensor<float> Step(
-        Tensor<float> x,
-        Tensor<float> velocity,
-        int stepIndex
-    );
+        // タイムステップ取得
+        public float[] GetTimesteps();
+        public float GetTimestep(int index);
+        public float GetDt(int stepIndex);
+
+        // Euler積分ステップ
+        public float[] Step(float[] x, float[] velocity, int stepIndex);
+        public void StepInPlace(float[] x, float[] velocity, int stepIndex);
+    }
+}
+```
+
+### TokenMap（実装済み）
+
+```csharp
+namespace uZipVoice.Tokenizer
+{
+    public class TokenMap
+    {
+        // 特殊トークン定数
+        public const string PAD = "_";
+        public const string BOS = "^";
+        public const string EOS = "$";
+        public const string SPACE = " ";
+
+        // プロパティ
+        public int Count { get; }
+        public int PadId { get; }
+        public int BosId { get; }
+        public int EosId { get; }
+        public int SpaceId { get; }
+
+        // 読み込み
+        public void LoadFromFile(string filePath);
+        public void LoadFromTextAsset(TextAsset textAsset);
+        public void LoadFromString(string content);
+
+        // トークン操作
+        public int GetTokenId(string phoneme);
+        public int GetTokenIdOrDefault(string phoneme, int defaultValue = -1);
+        public string GetPhoneme(int id);
+        public bool ContainsPhoneme(string phoneme);
+        public bool ContainsId(int id);
+        public int[] PhonemeToIds(string[] phonemes);
+    }
 }
 ```
 
@@ -320,14 +378,24 @@ Assets/uZipVoice/StreamingAssets/espeak-ng-data/
 
 ## 8. 実装優先順位
 
-| 順序 | コンポーネント | 依存関係 | 見積もり |
-|------|---------------|---------|---------|
-| 1 | プロジェクト基盤 | - | - |
-| 2 | EspeakTokenizer | espeak-ng DLL | - |
-| 3 | TextEncoder | Inference Engine | - |
-| 4 | EulerSolver | - | - |
-| 5 | FMDecoder | EulerSolver | - |
-| 6 | Vocos | Inference Engine | - |
-| 7 | ISTFTProcessor | NWaves | - |
-| 8 | ZipVoiceManager | 全コンポーネント | - |
-| 9 | サンプル・テスト | ZipVoiceManager | - |
+| 順序 | コンポーネント | 依存関係 | 状態 |
+|------|---------------|---------|------|
+| 1 | プロジェクト基盤 | - | ✅ 完了 |
+| 2 | TokenMap | - | ✅ 完了 |
+| 3 | EulerSolver | - | ✅ 完了 |
+| 4 | EspeakTokenizer | espeak-ng DLL | 🔲 未実装 |
+| 5 | TextEncoder | Inference Engine | 🔲 未実装 |
+| 6 | FMDecoder | EulerSolver | 🔲 未実装 |
+| 7 | Vocos | Inference Engine | 🔲 未実装 |
+| 8 | ISTFTProcessor | NWaves | 🔲 未実装 |
+| 9 | FeatureExtractor | - | 🔲 未実装 |
+| 10 | ZipVoiceManager | 全コンポーネント | 🔲 未実装 |
+| 11 | サンプル・テスト | ZipVoiceManager | 🔲 未実装 |
+
+### テスト実装状況
+
+| コンポーネント | テスト数 | 状態 |
+|--------------|---------|------|
+| TokenMapTests | 24 | ✅ 全テスト成功 |
+| EulerSolverTests | 32 | ✅ 全テスト成功 |
+| 合計 | 56 | ✅ 全テスト成功 |

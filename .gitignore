@@ -78,3 +78,6 @@ crashlytics-build.properties
 
 # Large model files
 *.onnx
+
+# uLoopMCP output
+.uloop/

@@ -31,6 +31,20 @@ namespace uZipVoice.Editor
             var managerGO = new GameObject("ZipVoiceManager");
             var manager = managerGO.AddComponent<ZipVoiceManager>();
 
+            // TokensAsset を設定
+            var tokensAsset = AssetDatabase.LoadAssetAtPath<TextAsset>("Assets/uZipVoice/Resources/tokens.txt");
+            if (tokensAsset != null)
+            {
+                var managerSO = new SerializedObject(manager);
+                managerSO.FindProperty("TokensAsset").objectReferenceValue = tokensAsset;
+                managerSO.ApplyModifiedProperties();
+                Debug.Log("[TTSSampleSceneCreator] TokensAsset assigned");
+            }
+            else
+            {
+                Debug.LogWarning("[TTSSampleSceneCreator] tokens.txt not found at Assets/uZipVoice/Resources/tokens.txt");
+            }
+
             // AudioSource を追加
             var audioSource = managerGO.AddComponent<AudioSource>();
             audioSource.playOnAwake = false;

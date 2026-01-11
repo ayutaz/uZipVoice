@@ -261,6 +261,17 @@ namespace uZipVoice.Core
                     progress => Debug.Log($"[ZipVoiceManager] FM Decoder progress: {progress * 100:F0}%")
                 );
 
+                // デバッグ: FMDecoder出力の統計
+                float[] melData = melFeatures.DownloadToArray();
+                float melMin = float.MaxValue, melMax = float.MinValue, melSum = 0;
+                for (int i = 0; i < melData.Length; i++)
+                {
+                    melMin = Math.Min(melMin, melData[i]);
+                    melMax = Math.Max(melMax, melData[i]);
+                    melSum += melData[i];
+                }
+                Debug.Log($"[ZipVoiceManager] Mel features stats: min={melMin:F4}, max={melMax:F4}, mean={melSum / melData.Length:F4}, shape=[{melFeatures.shape[0]}, {melFeatures.shape[1]}, {melFeatures.shape[2]}]");
+
                 // 6. メル特徴量を転置 [1, T, 100] → [1, 100, T]
                 using var melTransposed = Vocos.TransposeMelFeatures(melFeatures);
 
@@ -273,12 +284,50 @@ namespace uZipVoice.Core
                 Debug.Log("[ZipVoiceManager] Running ISTFT...");
                 int numBins = vocosOutput.Magnitude.shape[1];
                 int numFrames = vocosOutput.Magnitude.shape[2];
+                Debug.Log($"[ZipVoiceManager] Vocos output: numBins={numBins}, numFrames={numFrames}");
 
                 float[] magnitude = vocosOutput.Magnitude.DownloadToArray();
                 float[] phaseCos = vocosOutput.PhaseCos.DownloadToArray();
                 float[] phaseSin = vocosOutput.PhaseSin.DownloadToArray();
 
+                // デバッグ: Vocos出力の統計
+                float magMin = float.MaxValue, magMax = float.MinValue, magSum = 0;
+                for (int i = 0; i < magnitude.Length; i++)
+                {
+                    magMin = Math.Min(magMin, magnitude[i]);
+                    magMax = Math.Max(magMax, magnitude[i]);
+                    magSum += magnitude[i];
+                }
+                Debug.Log($"[ZipVoiceManager] Magnitude stats: min={magMin:F4}, max={magMax:F4}, mean={magSum / magnitude.Length:F4}");
+
                 float[] waveform = _istftProcessor.Process(magnitude, phaseCos, phaseSin, numBins, numFrames);
+
+                // デバッグ: 波形の統計
+                float waveMin = float.MaxValue, waveMax = float.MinValue;
+                int nanCount = 0, infCount = 0;
+                for (int i = 0; i < waveform.Length; i++)
+                {
+                    if (float.IsNaN(waveform[i])) nanCount++;
+                    else if (float.IsInfinity(waveform[i])) infCount++;
+                    else
+                    {
+                        waveMin = Math.Min(waveMin, waveform[i]);
+                        waveMax = Math.Max(waveMax, waveform[i]);
+                    }
+                }
+                Debug.Log($"[ZipVoiceManager] Waveform stats: min={waveMin:F4}, max={waveMax:F4}, length={waveform.Length}, NaN={nanCount}, Inf={infCount}");
+
+                // 波形を正規化 (-1.0 〜 1.0)
+                float absMax = Math.Max(Math.Abs(waveMin), Math.Abs(waveMax));
+                if (absMax > 1e-6f)
+                {
+                    float scale = 0.95f / absMax; // 少しマージンを持たせる
+                    for (int i = 0; i < waveform.Length; i++)
+                    {
+                        waveform[i] *= scale;
+                    }
+                    Debug.Log($"[ZipVoiceManager] Waveform normalized with scale={scale:F4}");
+                }
 
                 // 9. AudioClipを作成
                 int sampleRate = Config != null ? Config.SampleRate : 24000;

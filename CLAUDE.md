@@ -45,11 +45,18 @@ for (int i = 0; i < numSteps; i++) {
 
 ### 3. ISTFT（逆短時間フーリエ変換）
 
-Vocosの出力をオーディオ波形に変換。
+Vocosの出力をオーディオ波形に変換。NWavesライブラリを使用。
 
+- **ライブラリ**: NWaves 0.9.6 (`Assets/uZipVoice/Plugins/NWaves.dll`)
 - **n_fft**: 1024
 - **hop_length**: 256
-- **window**: hann
+- **window**: Hann
+
+```csharp
+// NWaves STFT逆変換
+var stft = new Stft(nFft: 1024, hopSize: 256, WindowType.Hann);
+float[] waveform = stft.Inverse(spectrogram);
+```
 
 ### 4. Tokenizer
 
@@ -133,7 +140,7 @@ Audio:
 メル特徴量 (100次元)
   ↓ Vocos (ONNX)
 STFT係数
-  ↓ ISTFT (C#実装)
+  ↓ ISTFT (NWaves)
 波形 (24kHz)
 ```
 
@@ -143,10 +150,11 @@ STFT係数
 - ✅ TextEncoder - テキストトークン→条件ベクトル変換
 - ✅ FMDecoder - Flow Matching ODE積分（非同期対応）
 - ✅ Vocos - メル特徴量→STFT係数変換
-- ✅ ISTFTProcessor - STFT→波形変換
+- ✅ ISTFTProcessor - NWavesライブラリによるSTFT→波形変換
 - ✅ EspeakTokenizer - テキスト→トークン変換
 - ✅ ZipVoiceManager - 統合API
 - ✅ UniTask対応 - UIフリーズ防止
+- ✅ NWaves導入 - 高精度ISTFT実装
 
 ### テンソル形状の重要な注意点
 

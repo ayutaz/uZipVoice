@@ -160,17 +160,45 @@ public static extern IntPtr espeak_TextToPhonemes(ref IntPtr text, int textmode,
 | FftSharp | △ 要実装 | MIT | ◯ |
 | DSPLib | △ 要実装 | - | ◯ |
 
-### NWaves
+### NWaves（採用）
 
 - バージョン: 0.9.6
 - GitHub: https://github.com/ar1st0crat/NWaves
-- NuGet: `Install-Package NWaves`
+- インストール方法: NuGet.orgから直接DLLをダウンロードし、Pluginsフォルダに配置
 
+**注意**: OpenUPMのUnityNuGetレジストリにはNWavesが登録されていないため、手動でDLLをダウンロードする必要があります。
+
+```bash
+# NuGet.orgからダウンロード
+curl -L -o nwaves.nupkg "https://www.nuget.org/api/v2/package/NWaves/0.9.6"
+
+# 展開してDLLを取得
+unzip nwaves.nupkg -d nwaves_extracted
+# lib/netstandard2.0/NWaves.dll をPluginsフォルダにコピー
+```
+
+**asmdef設定**:
+```json
+{
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "NWaves.dll"
+    ]
+}
+```
+
+**使用例**:
 ```csharp
 using NWaves.Transforms;
+using NWaves.Windows;
 
-var stft = new Stft(nFft: 1024, hopSize: 256, window: WindowTypes.Hann);
-var reconstructed = stft.Inverse(timefreq);
+var stft = new Stft(nFft: 1024, hopSize: 256, WindowType.Hann);
+
+// スペクトログラム: List<(float[] real, float[] imag)>
+var spectrogram = new List<(float[], float[])>();
+// ... フレームごとに(実部, 虚部)を追加 ...
+
+float[] waveform = stft.Inverse(spectrogram);
 ```
 
 ---

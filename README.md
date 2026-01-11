@@ -14,6 +14,7 @@ Unity implementation of [ZipVoice](https://github.com/Zengyi-Qin/ZipVoice) - a l
 - Unity 6 (6000.0.38f1 or later)
 - Unity AI Inference Engine 2.4.1+
 - UniTask 2.5.10+
+- NWaves 0.9.6 (included as DLL)
 - espeak-ng data files (included in StreamingAssets)
 
 ## Installation
@@ -121,7 +122,7 @@ Mel Features (100 dim)
     ▼ Vocos (ONNX)
 STFT Coefficients
     │
-    ▼ ISTFT (C# implementation)
+    ▼ ISTFT (NWaves library)
 Waveform (24kHz)
 ```
 
@@ -136,7 +137,7 @@ Waveform (24kHz)
 | `TextEncoder` | ONNX inference for text encoding |
 | `FMDecoder` | Flow Matching decoder with Euler solver |
 | `Vocos` | Vocoder for mel to STFT conversion |
-| `ISTFTProcessor` | Inverse STFT for waveform generation |
+| `ISTFTProcessor` | Inverse STFT using NWaves library |
 | `FeatureExtractor` | Mel spectrogram extraction from audio |
 
 ## Configuration
@@ -190,6 +191,7 @@ Assets/uZipVoice/
 │   ├── fm_decoder.onnx
 │   └── vocos_opset15.onnx
 ├── Plugins/
+│   ├── NWaves.dll
 │   └── Windows/x64/
 │       └── libespeak-ng.dll
 └── Resources/
@@ -218,6 +220,7 @@ MIT License
 - [ZipVoice](https://github.com/Zengyi-Qin/ZipVoice) - Original Python implementation
 - [espeak-ng](https://github.com/espeak-ng/espeak-ng) - Text-to-phoneme conversion
 - [Vocos](https://github.com/gemelo-ai/vocos) - Neural vocoder
+- [NWaves](https://github.com/ar1st0crat/NWaves) - Digital signal processing library for ISTFT
 
 ## Related Projects
 

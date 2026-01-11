@@ -1,4 +1,5 @@
 using System;
+using NWaves.Transforms;
 using UnityEngine;
 
 namespace uZipVoice.Audio
@@ -15,6 +16,7 @@ namespace uZipVoice.Audio
         private readonly int _nMels;
         private readonly float[] _window;
         private readonly float[,] _melFilterbank;
+        private readonly Fft _fft;
 
         /// <summary>
         /// サンプルレート
@@ -75,6 +77,7 @@ namespace uZipVoice.Audio
             _nMels = nMels;
             _window = CreateHannWindow(nFft);
             _melFilterbank = CreateMelFilterbank(sampleRate, nFft, nMels);
+            _fft = new Fft(nFft);
         }
 
         /// <summary>
@@ -114,8 +117,10 @@ namespace uZipVoice.Audio
                     frame[i] = sampleIdx < audio.Length ? audio[sampleIdx] * _window[i] : 0f;
                 }
 
-                // FFTを実行
-                FFT(frame, real, imag);
+                // FFTを実行（NWaves使用）
+                Array.Copy(frame, real, _nFft);
+                Array.Clear(imag, 0, _nFft);
+                _fft.Direct(real, imag);
 
                 // パワースペクトルを計算
                 float[] powerSpec = new float[numBins];
@@ -262,28 +267,6 @@ namespace uZipVoice.Audio
         private static float MelToHz(float mel)
         {
             return 700f * (Mathf.Pow(10f, mel / 2595f) - 1f);
-        }
-
-        /// <summary>
-        /// 簡易FFT
-        /// </summary>
-        private static void FFT(float[] input, float[] real, float[] imag)
-        {
-            int n = input.Length;
-
-            // 簡易的なDFT実装
-            for (int k = 0; k < n; k++)
-            {
-                real[k] = 0;
-                imag[k] = 0;
-
-                for (int t = 0; t < n; t++)
-                {
-                    float angle = -2f * Mathf.PI * t * k / n;
-                    real[k] += input[t] * Mathf.Cos(angle);
-                    imag[k] += input[t] * Mathf.Sin(angle);
-                }
-            }
         }
 
         /// <summary>

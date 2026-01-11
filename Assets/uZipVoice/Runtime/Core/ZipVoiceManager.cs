@@ -1,0 +1,319 @@
+using System;
+using System.IO;
+using System.Threading.Tasks;
+using Unity.InferenceEngine;
+using UnityEngine;
+using uZipVoice.Audio;
+using uZipVoice.Inference;
+using uZipVoice.Tokenizer;
+
+namespace uZipVoice.Core
+{
+    /// <summary>
+    /// ZipVoice メインAPI
+    /// 音声合成の統合管理
+    /// </summary>
+    public class ZipVoiceManager : MonoBehaviour, IDisposable
+    {
+        [Header("Model Assets")]
+        [Tooltip("text_encoder.onnx")]
+        public ModelAsset TextEncoderModel;
+
+        [Tooltip("fm_decoder.onnx")]
+        public ModelAsset FMDecoderModel;
+
+        [Tooltip("vocos_opset15.onnx")]
+        public ModelAsset VocosModel;
+
+        [Header("Resources")]
+        [Tooltip("tokens.txt")]
+        public TextAsset TokensAsset;
+
+        [Header("Settings")]
+        [Tooltip("設定（nullの場合はデフォルト値を使用）")]
+        public ZipVoiceConfig Config;
+
+        [Tooltip("推論バックエンド")]
+        public BackendType Backend = BackendType.GPUCompute;
+
+        // コンポーネント
+        private TokenMap _tokenMap;
+        private EspeakTokenizer _tokenizer;
+        private TextEncoder _textEncoder;
+        private FMDecoder _fmDecoder;
+        private Vocos _vocos;
+        private ISTFTProcessor _istftProcessor;
+        private FeatureExtractor _featureExtractor;
+
+        private bool _isInitialized;
+        private bool _isProcessing;
+        private bool _isDisposed;
+
+        /// <summary>
+        /// 初期化済みかどうか
+        /// </summary>
+        public bool IsInitialized => _isInitialized;
+
+        /// <summary>
+        /// 処理中かどうか
+        /// </summary>
+        public bool IsProcessing => _isProcessing;
+
+        /// <summary>
+        /// 初期化
+        /// </summary>
+        public async Task InitializeAsync()
+        {
+            if (_isInitialized)
+            {
+                Debug.LogWarning("[ZipVoiceManager] Already initialized");
+                return;
+            }
+
+            try
+            {
+                Debug.Log("[ZipVoiceManager] Initializing...");
+
+                // 設定を取得（なければデフォルト）
+                int sampleRate = Config != null ? Config.SampleRate : 24000;
+                int nFft = Config != null ? Config.NFft : 1024;
+                int hopLength = Config != null ? Config.HopLength : 256;
+                int nMels = Config != null ? Config.NMels : 100;
+                string voice = Config != null ? Config.Voice : "en-us";
+
+                // TokenMapを初期化
+                _tokenMap = new TokenMap();
+                if (TokensAsset != null)
+                {
+                    _tokenMap.LoadFromTextAsset(TokensAsset);
+                    Debug.Log($"[ZipVoiceManager] TokenMap loaded: {_tokenMap.Count} tokens");
+                }
+                else
+                {
+                    throw new InvalidOperationException("TokensAsset is not assigned");
+                }
+
+                // Tokenizerを初期化
+                _tokenizer = new EspeakTokenizer(_tokenMap);
+                _tokenizer.Voice = voice;
+
+                string espeakDataPath = Path.Combine(Application.streamingAssetsPath, "espeak-ng-data");
+                if (Directory.Exists(espeakDataPath))
+                {
+                    _tokenizer.Initialize(espeakDataPath);
+                    Debug.Log("[ZipVoiceManager] EspeakTokenizer initialized");
+                }
+                else
+                {
+                    Debug.LogWarning($"[ZipVoiceManager] espeak-ng-data not found at {espeakDataPath}");
+                }
+
+                // TextEncoderを初期化
+                if (TextEncoderModel != null)
+                {
+                    _textEncoder = new TextEncoder();
+                    _textEncoder.LoadModel(TextEncoderModel, Backend);
+                    Debug.Log("[ZipVoiceManager] TextEncoder loaded");
+                }
+                else
+                {
+                    Debug.LogWarning("[ZipVoiceManager] TextEncoderModel is not assigned");
+                }
+
+                // FMDecoderを初期化
+                if (FMDecoderModel != null)
+                {
+                    _fmDecoder = new FMDecoder();
+                    _fmDecoder.LoadModel(FMDecoderModel, Backend);
+                    Debug.Log("[ZipVoiceManager] FMDecoder loaded");
+                }
+                else
+                {
+                    Debug.LogWarning("[ZipVoiceManager] FMDecoderModel is not assigned");
+                }
+
+                // Vocosを初期化
+                if (VocosModel != null)
+                {
+                    _vocos = new Vocos();
+                    _vocos.LoadModel(VocosModel, Backend);
+                    Debug.Log("[ZipVoiceManager] Vocos loaded");
+                }
+                else
+                {
+                    Debug.LogWarning("[ZipVoiceManager] VocosModel is not assigned");
+                }
+
+                // オーディオプロセッサを初期化
+                _istftProcessor = new ISTFTProcessor(nFft, hopLength);
+                _featureExtractor = new FeatureExtractor(sampleRate, nFft, hopLength, nMels);
+
+                _isInitialized = true;
+                Debug.Log("[ZipVoiceManager] Initialization complete");
+
+                await Task.CompletedTask;
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[ZipVoiceManager] Initialization failed: {ex.Message}");
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// 音声合成
+        /// </summary>
+        /// <param name="text">合成するテキスト</param>
+        /// <param name="promptAudio">プロンプト音声（声質の参照）</param>
+        /// <param name="promptText">プロンプトテキスト</param>
+        /// <param name="options">合成オプション（nullの場合はデフォルト）</param>
+        /// <returns>生成されたAudioClip</returns>
+        public async Task<AudioClip> SynthesizeAsync(
+            string text,
+            AudioClip promptAudio,
+            string promptText,
+            SynthesisOptions options = null)
+        {
+            ThrowIfNotInitialized();
+
+            if (string.IsNullOrEmpty(text))
+            {
+                throw new ArgumentException("Text cannot be null or empty", nameof(text));
+            }
+
+            if (_isProcessing)
+            {
+                throw new InvalidOperationException("Already processing");
+            }
+
+            _isProcessing = true;
+
+            try
+            {
+                // オプションを取得
+                int numSteps = options?.NumSteps ?? (Config != null ? Config.NumSteps : 16);
+                float guidanceScale = options?.GuidanceScale ?? (Config != null ? Config.GuidanceScale : 1.0f);
+                float speed = options?.Speed ?? (Config != null ? Config.Speed : 1.0f);
+                float tShift = Config != null ? Config.TShift : 0.5f;
+
+                Debug.Log($"[ZipVoiceManager] Synthesizing: \"{text}\" (steps={numSteps}, guidance={guidanceScale}, speed={speed})");
+
+                // 1. テキストをトークン化
+                int[] tokens = _tokenizer.Tokenize(text);
+                int[] promptTokens = _tokenizer.Tokenize(promptText ?? "");
+
+                // 2. プロンプト音声からメル特徴量を抽出
+                float[,] promptMel = null;
+                int promptFeaturesLen = 0;
+
+                if (promptAudio != null)
+                {
+                    promptMel = _featureExtractor.ExtractMelSpectrogram(promptAudio);
+                    promptFeaturesLen = promptMel.GetLength(0);
+                }
+
+                // 3. TextEncoderで条件ベクトルを生成
+                using var textCondition = _textEncoder.Execute(tokens, promptTokens, promptFeaturesLen, speed);
+
+                // 4. 音声条件を作成（プロンプトメル特徴量から）
+                int seqLen = textCondition.shape[1];
+                int featDim = 100;
+                float[] speechCondData = new float[1 * seqLen * featDim];
+
+                if (promptMel != null)
+                {
+                    // プロンプトメル特徴量をコピー
+                    int copyLen = Math.Min(promptFeaturesLen, seqLen);
+                    for (int t = 0; t < copyLen; t++)
+                    {
+                        for (int f = 0; f < featDim; f++)
+                        {
+                            speechCondData[t * featDim + f] = promptMel[t, f];
+                        }
+                    }
+                }
+
+                using var speechCondition = new Tensor<float>(
+                    new TensorShape(1, seqLen, featDim),
+                    speechCondData
+                );
+
+                // 5. EulerSolverでFMDecoderを積分
+                var solver = new EulerSolver(numSteps, tShift);
+
+                // textConditionを [1, T, 512] → [1, T, 100] に変換する必要がある
+                // 実際のモデルの仕様に合わせて調整が必要
+                using var melFeatures = _fmDecoder.Generate(solver, textCondition, speechCondition, guidanceScale);
+
+                // 6. メル特徴量を転置 [1, T, 100] → [1, 100, T]
+                using var melTransposed = Vocos.TransposeMelFeatures(melFeatures);
+
+                // 7. Vocosでメル→STFT係数
+                using var vocosOutput = _vocos.Execute(melTransposed);
+
+                // 8. ISTFTで波形に変換
+                int numBins = vocosOutput.Magnitude.shape[1];
+                int numFrames = vocosOutput.Magnitude.shape[2];
+
+                float[] magnitude = vocosOutput.Magnitude.DownloadToArray();
+                float[] phaseCos = vocosOutput.PhaseCos.DownloadToArray();
+                float[] phaseSin = vocosOutput.PhaseSin.DownloadToArray();
+
+                float[] waveform = _istftProcessor.Process(magnitude, phaseCos, phaseSin, numBins, numFrames);
+
+                // 9. AudioClipを作成
+                int sampleRate = Config != null ? Config.SampleRate : 24000;
+                AudioClip clip = AudioClip.Create("Synthesized", waveform.Length, 1, sampleRate, false);
+                clip.SetData(waveform, 0);
+
+                Debug.Log($"[ZipVoiceManager] Synthesis complete. Duration: {clip.length:F2}s");
+
+                return clip;
+            }
+            finally
+            {
+                _isProcessing = false;
+            }
+        }
+
+        /// <summary>
+        /// リソースを解放
+        /// </summary>
+        public void Dispose()
+        {
+            if (_isDisposed)
+            {
+                return;
+            }
+
+            _tokenizer?.Dispose();
+            _textEncoder?.Dispose();
+            _fmDecoder?.Dispose();
+            _vocos?.Dispose();
+
+            _tokenizer = null;
+            _textEncoder = null;
+            _fmDecoder = null;
+            _vocos = null;
+            _tokenMap = null;
+            _istftProcessor = null;
+            _featureExtractor = null;
+
+            _isInitialized = false;
+            _isDisposed = true;
+        }
+
+        private void OnDestroy()
+        {
+            Dispose();
+        }
+
+        private void ThrowIfNotInitialized()
+        {
+            if (!_isInitialized)
+            {
+                throw new InvalidOperationException("ZipVoiceManager is not initialized. Call InitializeAsync() first.");
+            }
+        }
+    }
+}

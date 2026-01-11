@@ -8,12 +8,17 @@ namespace uZipVoice.Inference
     /// <summary>
     /// FM Decoder - Flow Matchingデコーダ
     /// EulerSolverと組み合わせてメル特徴量を生成
+    /// GPU-CPU転送を最小化することで高速化
     /// </summary>
     public class FMDecoder : IDisposable
     {
         private Model _model;
         private Worker _worker;
+        private BackendType _backendType;
         private bool _isDisposed;
+
+        // 再利用可能なバッファ（メモリアロケーション削減）
+        private float[] _xBuffer;
 
         /// <summary>
         /// モデルが読み込まれているかどうか
@@ -46,6 +51,7 @@ namespace uZipVoice.Inference
 
             _model = ModelLoader.Load(modelAsset);
             _worker = new Worker(_model, backendType);
+            _backendType = backendType;
 
             Debug.Log($"[FMDecoder] Model loaded. Backend: {backendType}");
         }
@@ -103,7 +109,7 @@ namespace uZipVoice.Inference
         }
 
         /// <summary>
-        /// EulerSolverを使用して全ステップの積分を実行（非同期版）
+        /// EulerSolverを使用して全ステップの積分を実行（非同期版・最適化）
         /// </summary>
         /// <param name="solver">EulerSolver</param>
         /// <param name="textCondition">テキスト条件 [1, T, 100]</param>
@@ -129,25 +135,29 @@ namespace uZipVoice.Inference
             int batchSize = textCondition.shape[0];
             int seqLen = textCondition.shape[1];
             int featDim = FeatureDim;
+            int totalSize = batchSize * seqLen * featDim;
 
-            float[] noiseData = new float[batchSize * seqLen * featDim];
-            var random = new System.Random();
-            for (int i = 0; i < noiseData.Length; i++)
+            // バッファを再利用（メモリアロケーション削減）
+            if (_xBuffer == null || _xBuffer.Length != totalSize)
             {
-                // Box-Muller変換で正規分布ノイズを生成
-                double u1 = 1.0 - random.NextDouble();
-                double u2 = 1.0 - random.NextDouble();
-                noiseData[i] = (float)(Math.Sqrt(-2.0 * Math.Log(u1)) * Math.Sin(2.0 * Math.PI * u2));
+                _xBuffer = new float[totalSize];
             }
 
-            var x = new Tensor<float>(
-                new TensorShape(batchSize, seqLen, featDim),
-                noiseData
-            );
+            // Box-Muller変換で正規分布ノイズを生成
+            var random = new System.Random();
+            for (int i = 0; i < totalSize; i++)
+            {
+                double u1 = 1.0 - random.NextDouble();
+                double u2 = 1.0 - random.NextDouble();
+                _xBuffer[i] = (float)(Math.Sqrt(-2.0 * Math.Log(u1)) * Math.Sin(2.0 * Math.PI * u2));
+            }
+
+            var shape = new TensorShape(batchSize, seqLen, featDim);
+            var x = new Tensor<float>(shape, _xBuffer);
 
             float[] timesteps = solver.GetTimesteps();
 
-            // Euler積分ループ
+            // Euler積分ループ（バッファ再利用で高速化）
             for (int step = 0; step < solver.NumSteps; step++)
             {
                 float t = timesteps[step];
@@ -156,27 +166,30 @@ namespace uZipVoice.Inference
                 // 速度を計算
                 using var velocity = ExecuteStep(t, x, textCondition, speechCondition, guidanceScale);
 
-                // x = x + dt * velocity
-                float[] xData = x.DownloadToArray();
-                float[] vData = velocity.DownloadToArray();
+                // 速度データを取得
+                var vData = velocity.DownloadToArray();
 
-                for (int i = 0; i < xData.Length; i++)
+                // xデータを取得
+                var xData = x.DownloadToArray();
+
+                // CPU上でEulerステップを実行してバッファに格納
+                for (int i = 0; i < totalSize; i++)
                 {
-                    xData[i] += dt * vData[i];
+                    _xBuffer[i] = xData[i] + dt * vData[i];
                 }
 
-                // 古いテンソルを解放して新しいテンソルを作成
+                // 古いテンソルを解放して新しいテンソルを作成（1回のアップロード）
                 x.Dispose();
-                x = new Tensor<float>(
-                    new TensorShape(batchSize, seqLen, featDim),
-                    xData
-                );
+                x = new Tensor<float>(shape, _xBuffer);
 
                 // 進捗を報告
                 onProgress?.Invoke((float)(step + 1) / solver.NumSteps);
 
-                // UIスレッドに制御を戻す（フリーズ防止）
-                await UniTask.Yield();
+                // 4ステップごとにUIスレッドに制御を戻す（フリーズ防止、頻度を下げて高速化）
+                if (step % 4 == 0)
+                {
+                    await UniTask.Yield();
+                }
             }
 
             return x;
@@ -195,6 +208,7 @@ namespace uZipVoice.Inference
             _worker?.Dispose();
             _worker = null;
             _model = null;
+            _xBuffer = null;
             _isDisposed = true;
         }
 

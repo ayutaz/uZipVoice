@@ -49,6 +49,9 @@ namespace uZipVoice.Core
         private bool _isProcessing;
         private bool _isDisposed;
 
+        // メル特徴量のスケール係数（Pythonと同じ値）
+        private const float FeatScale = 0.1f;
+
         /// <summary>
         /// 初期化済みかどうか
         /// </summary>
@@ -181,6 +184,12 @@ namespace uZipVoice.Core
                 throw new ArgumentException("Text cannot be null or empty", nameof(text));
             }
 
+            if (promptAudio == null)
+            {
+                throw new ArgumentNullException(nameof(promptAudio),
+                    "Prompt audio is required for voice cloning. Please assign a prompt audio clip in the Inspector.");
+            }
+
             if (_isProcessing)
             {
                 throw new InvalidOperationException("Already processing");
@@ -235,13 +244,14 @@ namespace uZipVoice.Core
 
                 if (promptMel != null)
                 {
-                    // プロンプトメル特徴量をコピー
+                    // プロンプトメル特徴量をコピー（feat_scaleを適用）
                     int copyLen = Math.Min(promptFeaturesLen, seqLen);
+                    int melDim = promptMel.GetLength(1); // 実際のメル次元数（100）
                     for (int t = 0; t < copyLen; t++)
                     {
-                        for (int f = 0; f < featDim; f++)
+                        for (int f = 0; f < Math.Min(featDim, melDim); f++)
                         {
-                            speechCondData[t * featDim + f] = promptMel[t, f];
+                            speechCondData[t * featDim + f] = promptMel[t, f] * FeatScale;
                         }
                     }
                 }
@@ -270,10 +280,29 @@ namespace uZipVoice.Core
                     melMax = Math.Max(melMax, melData[i]);
                     melSum += melData[i];
                 }
-                Debug.Log($"[ZipVoiceManager] Mel features stats: min={melMin:F4}, max={melMax:F4}, mean={melSum / melData.Length:F4}, shape=[{melFeatures.shape[0]}, {melFeatures.shape[1]}, {melFeatures.shape[2]}]");
+                Debug.Log($"[ZipVoiceManager] Mel features stats (before scale): min={melMin:F4}, max={melMax:F4}, mean={melSum / melData.Length:F4}, shape=[{melFeatures.shape[0]}, {melFeatures.shape[1]}, {melFeatures.shape[2]}]");
 
-                // 6. メル特徴量を転置 [1, T, 100] → [1, 100, T]
-                using var melTransposed = Vocos.TransposeMelFeatures(melFeatures);
+                // 6. feat_scaleを元に戻す（Pythonと同じ処理）
+                for (int i = 0; i < melData.Length; i++)
+                {
+                    melData[i] /= FeatScale;
+                }
+
+                // スケール復元後のテンソルを作成
+                using var melScaled = new Tensor<float>(melFeatures.shape, melData);
+
+                // デバッグ: スケール復元後の統計
+                melMin = float.MaxValue; melMax = float.MinValue; melSum = 0;
+                for (int i = 0; i < melData.Length; i++)
+                {
+                    melMin = Math.Min(melMin, melData[i]);
+                    melMax = Math.Max(melMax, melData[i]);
+                    melSum += melData[i];
+                }
+                Debug.Log($"[ZipVoiceManager] Mel features stats (after scale): min={melMin:F4}, max={melMax:F4}, mean={melSum / melData.Length:F4}");
+
+                // 7. メル特徴量を転置 [1, T, 100] → [1, 100, T]
+                using var melTransposed = Vocos.TransposeMelFeatures(melScaled);
 
                 // 7. Vocosでメル→STFT係数
                 Debug.Log("[ZipVoiceManager] Running Vocos...");

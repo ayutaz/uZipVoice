@@ -204,11 +204,56 @@ namespace uZipVoice.Samples
         {
             if (_synthesizedClip == null || _audioSource == null)
             {
+                Debug.LogWarning($"[TTSSampleController] Cannot play: clip={_synthesizedClip}, audioSource={_audioSource}");
                 return;
             }
 
+            // AudioClipの状態をログ出力
+            Debug.Log($"[TTSSampleController] AudioClip: samples={_synthesizedClip.samples}, channels={_synthesizedClip.channels}, frequency={_synthesizedClip.frequency}, length={_synthesizedClip.length}s");
+
+            // 波形データの複数箇所を確認
+            float[] allData = new float[_synthesizedClip.samples];
+            _synthesizedClip.GetData(allData, 0);
+
+            // 全体の統計
+            float sum = 0, min = float.MaxValue, max = float.MinValue;
+            int positiveCount = 0, negativeCount = 0, nearZeroCount = 0;
+            for (int i = 0; i < allData.Length; i++)
+            {
+                sum += allData[i];
+                min = Mathf.Min(min, allData[i]);
+                max = Mathf.Max(max, allData[i]);
+                if (allData[i] > 0.01f) positiveCount++;
+                else if (allData[i] < -0.01f) negativeCount++;
+                else nearZeroCount++;
+            }
+            float mean = sum / allData.Length;
+            Debug.Log($"[TTSSampleController] Full waveform: min={min:F4}, max={max:F4}, mean={mean:F4}");
+            Debug.Log($"[TTSSampleController] Sample distribution: positive={positiveCount}, negative={negativeCount}, nearZero={nearZeroCount}");
+
+            // 異なる位置のサンプルを確認
+            int[] checkPositions = { 0, allData.Length / 4, allData.Length / 2, allData.Length * 3 / 4, allData.Length - 1000 };
+            foreach (int pos in checkPositions)
+            {
+                if (pos >= 0 && pos + 100 < allData.Length)
+                {
+                    float localMin = float.MaxValue, localMax = float.MinValue;
+                    for (int i = pos; i < pos + 100; i++)
+                    {
+                        localMin = Mathf.Min(localMin, allData[i]);
+                        localMax = Mathf.Max(localMax, allData[i]);
+                    }
+                    Debug.Log($"[TTSSampleController] Samples at {pos}: min={localMin:F4}, max={localMax:F4}");
+                }
+            }
+
+            // AudioSourceの状態をログ出力
+            Debug.Log($"[TTSSampleController] AudioSource: volume={_audioSource.volume}, mute={_audioSource.mute}, enabled={_audioSource.enabled}");
+
             _audioSource.clip = _synthesizedClip;
             _audioSource.Play();
+
+            Debug.Log($"[TTSSampleController] AudioSource.isPlaying={_audioSource.isPlaying}");
 
             if (_stopButton != null)
             {

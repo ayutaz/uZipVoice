@@ -1,0 +1,211 @@
+# uZipVoice
+
+Unity implementation of [ZipVoice](https://github.com/Zengyi-Qin/ZipVoice) - a lightweight zero-shot text-to-speech system using Flow Matching.
+
+## Features
+
+- **Zero-shot TTS**: Generate speech in any voice using just a few seconds of reference audio
+- **Fast Generation**: Flow Matching enables high-quality synthesis in 4-16 steps
+- **Unity Native**: Built for Unity 6 with AI Inference Engine (Sentis)
+- **Cross-platform**: Supports Windows (GPU/CPU inference)
+
+## Requirements
+
+- Unity 6 (6000.0.38f1 or later)
+- Unity AI Inference Engine 2.4.1+
+- espeak-ng data files (included in StreamingAssets)
+
+## Installation
+
+### 1. Clone the Repository
+
+```bash
+git clone https://github.com/ayutaz/uZipVoice.git
+```
+
+### 2. Open in Unity
+
+Open the project with Unity 6.
+
+### 3. Install Dependencies
+
+The following packages will be installed automatically:
+- `com.unity.ai.inference` (2.4.1)
+- TextMesh Pro
+
+### 4. Setup ONNX Models
+
+Export ONNX models from the original ZipVoice project and place them in `Assets/uZipVoice/Models/`:
+
+| File | Description |
+|------|-------------|
+| `text_encoder.onnx` | Text to condition vector |
+| `fm_decoder.onnx` | Flow Matching decoder |
+| `vocos_opset15.onnx` | Vocoder (mel to STFT) |
+
+### 5. Setup espeak-ng Data
+
+Copy `espeak-ng-data` folder to `Assets/StreamingAssets/`:
+
+```
+Assets/StreamingAssets/espeak-ng-data/
+```
+
+## Quick Start
+
+### Using the Sample Scene
+
+1. Open the sample scene: `Assets/uZipVoice/Samples/TTSSample.unity`
+2. Or create a new sample scene via menu: `uZipVoice > Create TTS Sample Scene`
+3. Assign ONNX models to `ZipVoiceManager` component
+4. Assign `tokens.txt` from `Assets/uZipVoice/Resources/`
+5. Enter Play mode and test TTS
+
+### Programmatic Usage
+
+```csharp
+using uZipVoice.Core;
+using UnityEngine;
+
+public class TTSExample : MonoBehaviour
+{
+    public ZipVoiceManager zipVoice;
+    public AudioSource audioSource;
+    public AudioClip promptAudio; // Reference voice
+
+    async void Start()
+    {
+        await zipVoice.InitializeAsync();
+
+        var options = new SynthesisOptions
+        {
+            NumSteps = 16,
+            Speed = 1.0f,
+            GuidanceScale = 1.0f
+        };
+
+        AudioClip clip = await zipVoice.SynthesizeAsync(
+            "Hello, this is a test.",
+            promptAudio,
+            "Reference text for the prompt audio.",
+            options
+        );
+
+        audioSource.clip = clip;
+        audioSource.Play();
+    }
+}
+```
+
+## Architecture
+
+```
+Text Input
+    │
+    ▼ Tokenizer (espeak-ng G2P)
+Token IDs
+    │
+    ▼ TextEncoder (ONNX)
+Condition Vector
+    │
+    ▼ FMDecoder (ONNX) × N steps (Euler ODE)
+Mel Features (100 dim)
+    │
+    ▼ Vocos (ONNX)
+STFT Coefficients
+    │
+    ▼ ISTFT (C# implementation)
+Waveform (24kHz)
+```
+
+## Components
+
+| Component | Description |
+|-----------|-------------|
+| `ZipVoiceManager` | Main API for TTS synthesis |
+| `ZipVoiceConfig` | ScriptableObject for configuration |
+| `EspeakTokenizer` | Text to phoneme conversion using espeak-ng |
+| `TokenMap` | Phoneme to token ID mapping |
+| `TextEncoder` | ONNX inference for text encoding |
+| `FMDecoder` | Flow Matching decoder with Euler solver |
+| `Vocos` | Vocoder for mel to STFT conversion |
+| `ISTFTProcessor` | Inverse STFT for waveform generation |
+| `FeatureExtractor` | Mel spectrogram extraction from audio |
+
+## Configuration
+
+### ZipVoiceConfig
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| SampleRate | 24000 | Audio sample rate |
+| NFft | 1024 | FFT size |
+| HopLength | 256 | Hop length for STFT |
+| NMels | 100 | Number of mel bands |
+| NumSteps | 16 | Euler solver steps (4-32) |
+| TShift | 0.5 | Time shift parameter |
+| GuidanceScale | 1.0 | CFG scale (0-3) |
+| Speed | 1.0 | Speech speed (0.5-2.0) |
+| Voice | en-us | espeak-ng voice |
+
+## Project Structure
+
+```
+Assets/uZipVoice/
+├── Runtime/
+│   ├── Audio/
+│   │   ├── FeatureExtractor.cs
+│   │   └── ISTFTProcessor.cs
+│   ├── Core/
+│   │   ├── ZipVoiceConfig.cs
+│   │   └── ZipVoiceManager.cs
+│   ├── Inference/
+│   │   ├── EulerSolver.cs
+│   │   ├── FMDecoder.cs
+│   │   ├── TextEncoder.cs
+│   │   └── Vocos.cs
+│   └── Tokenizer/
+│       ├── EspeakNative.cs
+│       ├── EspeakTokenizer.cs
+│       ├── ITokenizer.cs
+│       └── TokenMap.cs
+├── Editor/
+│   └── TTSSampleSceneCreator.cs
+├── Samples/
+│   ├── TTSSample.unity
+│   └── TTSSampleController.cs
+├── Models/
+│   └── (ONNX models)
+├── Plugins/
+│   └── Windows/x64/
+│       └── libespeak-ng.dll
+└── Resources/
+    └── tokens.txt
+```
+
+## Testing
+
+The project includes 75 unit tests:
+
+| Test Class | Tests | Description |
+|------------|-------|-------------|
+| TokenMapTests | 24 | Token mapping validation |
+| EulerSolverTests | 32 | ODE solver validation |
+| EspeakTokenizerTests | 19 | G2P conversion tests |
+
+Run tests via Unity Test Runner (Window > General > Test Runner).
+
+## License
+
+MIT License
+
+## Acknowledgments
+
+- [ZipVoice](https://github.com/Zengyi-Qin/ZipVoice) - Original Python implementation
+- [espeak-ng](https://github.com/espeak-ng/espeak-ng) - Text-to-phoneme conversion
+- [Vocos](https://github.com/gemelo-ai/vocos) - Neural vocoder
+
+## Related Projects
+
+- [ZipVoice](https://github.com/Zengyi-Qin/ZipVoice) - Original implementation
+- [piper-unity](https://github.com/Macoron/piper-unity) - Reference for espeak-ng integration

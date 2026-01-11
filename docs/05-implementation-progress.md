@@ -61,7 +61,7 @@ Flow MatchingのためのEuler ODE積分ソルバー。
 テキストトークンを条件ベクトルに変換するONNX推論ラッパー。
 
 **機能**:
-- Unity AI Inference Engine 2.3対応
+- Unity AI Inference Engine 2.4対応
 - GPU/CPUバックエンド選択可能
 - 入力: tokens, prompt_tokens, prompt_features_len, speed
 - 出力: text_condition [1, T, 512]
@@ -167,6 +167,8 @@ Vocoder。メルスペクトログラムからSTFT係数を生成。
 
 | 日付 | コミット | 内容 |
 |------|---------|------|
+| 2026-01-11 | 2248a46 | Add Unity AI Inference Engine package |
+| 2026-01-11 | f700375 | Update implementation progress documentation |
 | 2026-01-11 | 432ec64 | Add core TTS pipeline components |
 | 2026-01-11 | 5b715c0 | Add espeak-ng native plugin for Windows |
 | 2026-01-11 | f719280 | Add ITokenizer interface and EspeakTokenizer |
@@ -209,6 +211,21 @@ espeak-ngインストール済みの場合:
 ```
 C:\Program Files\eSpeak NG\espeak-ng-data → Assets\StreamingAssets\espeak-ng-data
 ```
+
+### Unity AI Inference Engine
+
+ONNX推論に必要なパッケージ:
+
+```
+Package: com.unity.ai.inference
+Version: 2.4.1
+Namespace: Unity.InferenceEngine
+Assembly: Unity.InferenceEngine
+```
+
+インストール: Package Manager → Add package by name → `com.unity.ai.inference`
+
+---
 
 ### OpenUPMスコープレジストリ
 

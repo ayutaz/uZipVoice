@@ -2,6 +2,8 @@
 
 Unity implementation of [ZipVoice](https://github.com/Zengyi-Qin/ZipVoice) - a lightweight zero-shot text-to-speech system using Flow Matching.
 
+English | [日本語](README_ja.md) | [中文](README_zh.md)
+
 ## Features
 
 - **Zero-shot TTS**: Generate speech in any voice using just a few seconds of reference audio

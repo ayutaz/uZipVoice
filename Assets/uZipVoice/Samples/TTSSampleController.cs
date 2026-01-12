@@ -72,9 +72,9 @@ namespace uZipVoice.Samples
             {
                 _stepsSlider.onValueChanged.AddListener(OnStepsChanged);
                 _stepsSlider.minValue = 4;
-                _stepsSlider.maxValue = 32;
+                _stepsSlider.maxValue = 16;
                 _stepsSlider.wholeNumbers = true;
-                _stepsSlider.value = 16;
+                _stepsSlider.value = 8;  // 蒸留モデルでは4-8が推奨
                 OnStepsChanged(_stepsSlider.value);
             }
 

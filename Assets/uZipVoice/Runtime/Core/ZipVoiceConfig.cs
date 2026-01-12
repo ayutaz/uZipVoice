@@ -22,9 +22,9 @@ namespace uZipVoice.Core
         public int NMels = 100;
 
         [Header("Inference Settings")]
-        [Tooltip("Euler Solverのステップ数")]
-        [Range(4, 32)]
-        public int NumSteps = 16;
+        [Tooltip("Euler Solverのステップ数（蒸留モデル推奨: 4-8）")]
+        [Range(4, 16)]
+        public int NumSteps = 8;
 
         [Tooltip("タイムシフトパラメータ")]
         [Range(0.1f, 1.0f)]
@@ -49,9 +49,9 @@ namespace uZipVoice.Core
     public class SynthesisOptions
     {
         /// <summary>
-        /// Euler Solverのステップ数
+        /// Euler Solverのステップ数（蒸留モデル推奨: 4-8）
         /// </summary>
-        public int NumSteps { get; set; } = 16;
+        public int NumSteps { get; set; } = 8;
 
         /// <summary>
         /// CFGスケール

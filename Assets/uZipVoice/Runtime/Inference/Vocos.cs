@@ -73,7 +73,9 @@ namespace uZipVoice.Inference
             _model = ModelLoader.Load(modelAsset);
             _worker = new Worker(_model, backendType);
 
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
             Debug.Log($"[Vocos] Model loaded. Backend: {backendType}");
+#endif
         }
 
         /// <summary>

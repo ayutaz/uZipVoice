@@ -8,7 +8,6 @@ namespace uZipVoice.Inference
     /// <summary>
     /// FM Decoder - Flow Matchingデコーダ
     /// EulerSolverと組み合わせてメル特徴量を生成
-    /// GPU-CPU転送を最小化することで高速化
     /// </summary>
     public class FMDecoder : IDisposable
     {
@@ -53,8 +52,11 @@ namespace uZipVoice.Inference
             _worker = new Worker(_model, backendType);
             _backendType = backendType;
 
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
             Debug.Log($"[FMDecoder] Model loaded. Backend: {backendType}");
+#endif
         }
+
 
         /// <summary>
         /// 単一ステップの推論を実行（速度ベクトルを返す）
@@ -109,7 +111,7 @@ namespace uZipVoice.Inference
         }
 
         /// <summary>
-        /// EulerSolverを使用して全ステップの積分を実行（非同期版・最適化）
+        /// EulerSolverを使用して全ステップの積分を実行（最適化版）
         /// </summary>
         /// <param name="solver">EulerSolver</param>
         /// <param name="textCondition">テキスト条件 [1, T, 100]</param>
@@ -157,42 +159,60 @@ namespace uZipVoice.Inference
 
             float[] timesteps = solver.GetTimesteps();
 
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
             Debug.Log($"[FMDecoder] Starting Euler integration: {solver.NumSteps} steps, seqLen={seqLen}");
-            var stepWatch = new System.Diagnostics.Stopwatch();
+            var totalWatch = System.Diagnostics.Stopwatch.StartNew();
+#endif
 
-            // Euler積分ループ（バッファ再利用で高速化）
+            // スカラーテンソルを事前に作成して再利用
+            using var guidanceScaleTensor = new Tensor<float>(new TensorShape(), new float[] { guidanceScale });
+
+            // Euler積分ループ（最適化版）
             for (int step = 0; step < solver.NumSteps; step++)
             {
-                stepWatch.Restart();
                 float t = timesteps[step];
                 float dt = solver.GetDt(step);
 
-                // 速度を計算
-                Debug.Log($"[FMDecoder] Step {step + 1}/{solver.NumSteps}: t={t:F4}, calling ExecuteStep...");
-                using var velocity = ExecuteStep(t, x, textCondition, speechCondition, guidanceScale);
-                Debug.Log($"[FMDecoder] Step {step + 1}: ExecuteStep took {stepWatch.ElapsedMilliseconds}ms");
+                // スカラーテンソルを作成
+                using var tTensor = new Tensor<float>(new TensorShape(), new float[] { t });
 
-                // 速度データを取得
+                // 入力を設定
+                _worker.SetInput("t", tTensor);
+                _worker.SetInput("x", x);
+                _worker.SetInput("text_condition", textCondition);
+                _worker.SetInput("speech_condition", speechCondition);
+                _worker.SetInput("guidance_scale", guidanceScaleTensor);
+
+                // 推論実行
+                _worker.Schedule();
+
+                // 速度を取得
+                var velocity = _worker.PeekOutput("v") as Tensor<float>;
                 var vData = velocity.DownloadToArray();
 
                 // xデータを取得
                 var xData = x.DownloadToArray();
 
-                // CPU上でEulerステップを実行してバッファに格納
+                // CPU上でEulerステップを実行（SIMD最適化可能）
                 for (int i = 0; i < totalSize; i++)
                 {
                     _xBuffer[i] = xData[i] + dt * vData[i];
                 }
 
-                // 古いテンソルを解放して新しいテンソルを作成（1回のアップロード）
+                // 古いテンソルを解放して新しいテンソルを作成
                 x.Dispose();
                 x = new Tensor<float>(shape, _xBuffer);
 
                 // 進捗を報告
                 onProgress?.Invoke((float)(step + 1) / solver.NumSteps);
-                // NOTE: UniTask.Yield()を削除 - Editorでブロックされる問題を回避
+
+                // 毎ステップでUIに制御を戻す（UIフリーズ防止）
+                await UniTask.Yield();
             }
 
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            Debug.Log($"[FMDecoder] Euler integration completed in {totalWatch.ElapsedMilliseconds}ms");
+#endif
             return x;
         }
 

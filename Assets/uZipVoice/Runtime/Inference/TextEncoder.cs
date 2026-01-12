@@ -45,7 +45,9 @@ namespace uZipVoice.Inference
             _model = ModelLoader.Load(modelAsset);
             _worker = new Worker(_model, backendType);
 
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
             Debug.Log($"[TextEncoder] Model loaded. Backend: {backendType}");
+#endif
         }
 
         /// <summary>
@@ -73,8 +75,6 @@ namespace uZipVoice.Inference
             {
                 throw new ArgumentException("Prompt tokens cannot be null or empty", nameof(promptTokens));
             }
-
-            Debug.Log($"[TextEncoder] tokens.Length={tokens.Length}, promptTokens.Length={promptTokens.Length}, promptFeaturesLen={promptFeaturesLen}");
 
             // INT32テンソルを作成（Sentisの推奨形式）
             // Note: ONNXはint64を期待するが、SentisはTensor<int>をint64として扱う

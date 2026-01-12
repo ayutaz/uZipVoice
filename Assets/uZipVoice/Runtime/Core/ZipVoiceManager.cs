@@ -205,18 +205,13 @@ namespace uZipVoice.Core
                 float speed = options?.Speed ?? (Config != null ? Config.Speed : 1.0f);
                 float tShift = Config != null ? Config.TShift : 0.5f;
 
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
                 Debug.Log($"[ZipVoiceManager] Synthesizing: \"{text}\" (steps={numSteps}, guidance={guidanceScale}, speed={speed})");
+#endif
 
                 // 1. テキストをトークン化
                 int[] tokens = _tokenizer.Tokenize(text);
                 int[] promptTokens = _tokenizer.Tokenize(promptText ?? "");
-
-                // DEBUG: Compare with Python values
-                Debug.Log($"[ZipVoiceManager] text_tokens: [{string.Join(", ", tokens)}] ({tokens.Length})");
-                Debug.Log($"[ZipVoiceManager] prompt_tokens: [{string.Join(", ", promptTokens)}] ({promptTokens.Length})");
-                // Python expected:
-                // text_tokens: [20, 59, 24, 120, 27, 100, 35, 120, 62, 122, 24, 17, 10] (13)
-                // prompt_tokens: [41, 74, 31, 74, 38, 50, 31, 120, 39, 25, 28, 59, 24, 28, 88, 120, 51, 122, 25, 28, 32, 32, 120, 61, 23, 31, 32, 10] (28)
 
                 // 2. プロンプト音声からメル特徴量を抽出
                 float[,] promptMel = null;
@@ -226,50 +221,26 @@ namespace uZipVoice.Core
                 {
                     promptMel = _featureExtractor.ExtractMelSpectrogram(promptAudio);
                     promptFeaturesLen = promptMel.GetLength(0);
-                    Debug.Log($"[ZipVoiceManager] promptMel shape: [{promptFeaturesLen}, {promptMel.GetLength(1)}]");
-                    // DEBUG: First 5 values of promptMel[0,:]
-                    if (promptFeaturesLen > 0 && promptMel.GetLength(1) >= 5)
-                    {
-                        Debug.Log($"[ZipVoiceManager] promptMel[0,:5] (before scale): [{promptMel[0,0]:F6}, {promptMel[0,1]:F6}, {promptMel[0,2]:F6}, {promptMel[0,3]:F6}, {promptMel[0,4]:F6}]");
-                    }
                 }
                 else
                 {
                     // プロンプト音声がない場合、デフォルトの出力長を計算
-                    // TextEncoderの計算式: features_len = (prompt_features_len / prompt_tokens_len * tokens_len / speed)
-                    // デフォルトでは1トークンあたり約10フレーム（約100ms）と仮定
                     int defaultFramesPerToken = 10;
                     promptFeaturesLen = promptTokens.Length * defaultFramesPerToken;
-                    Debug.Log($"[ZipVoiceManager] No prompt audio. Using estimated promptFeaturesLen={promptFeaturesLen}");
                 }
+
+                // UIに制御を戻す
+                await UniTask.Yield();
 
                 // 3. TextEncoderで条件ベクトルを生成
-                Debug.Log($"[ZipVoiceManager] Running TextEncoder with promptFeaturesLen={promptFeaturesLen}...");
-                // Python expected: prompt_features_len: 648
                 using var textCondition = _textEncoder.Execute(tokens, promptTokens, promptFeaturesLen, speed);
-                Debug.Log($"[ZipVoiceManager] textCondition shape: [{textCondition.shape[0]}, {textCondition.shape[1]}, {textCondition.shape[2]}]");
-                // Python expected: text_condition shape: (1, 949, 100)
 
-                // DEBUG: TextCondition statistics
-                float[] tcData = textCondition.DownloadToArray();
-                float tcMin = float.MaxValue, tcMax = float.MinValue, tcSum = 0;
-                for (int i = 0; i < tcData.Length; i++)
-                {
-                    tcMin = Math.Min(tcMin, tcData[i]);
-                    tcMax = Math.Max(tcMax, tcData[i]);
-                    tcSum += tcData[i];
-                }
-                Debug.Log($"[ZipVoiceManager] textCondition stats: min={tcMin:F6}, max={tcMax:F6}, mean={tcSum / tcData.Length:F6}");
-                // Python expected: min: -0.224190, max: 0.197560, mean: 0.001326
-                Debug.Log($"[ZipVoiceManager] textCondition[0,0,:5]: [{tcData[0]:F6}, {tcData[1]:F6}, {tcData[2]:F6}, {tcData[3]:F6}, {tcData[4]:F6}]");
-                // Python expected: [-0.007926, 0.000123, 0.001431, 0.001818, -0.000109]
-
-                // NOTE: UniTask.Yield()を削除 - Editorでブロックされる問題を回避
+                // UIに制御を戻す
+                await UniTask.Yield();
 
                 // 4. 音声条件を作成（プロンプトメル特徴量から）
                 int seqLen = textCondition.shape[1];
-                int featDim = textCondition.shape[2]; // TextEncoderの出力次元に合わせる
-                Debug.Log($"[ZipVoiceManager] Using seqLen={seqLen}, featDim={featDim}");
+                int featDim = textCondition.shape[2];
                 float[] speechCondData = new float[1 * seqLen * featDim];
 
                 if (promptMel != null)
@@ -294,32 +265,16 @@ namespace uZipVoice.Core
                 // 5. EulerSolverでFMDecoderを積分
                 var solver = new EulerSolver(numSteps, tShift);
 
-                // textConditionを [1, T, 512] → [1, T, 100] に変換する必要がある
-                // 実際のモデルの仕様に合わせて調整が必要
-                Debug.Log($"[ZipVoiceManager] Calling FMDecoder.GenerateAsync with numSteps={numSteps}...");
-                var fmStartTime = System.DateTime.Now;
                 using var melFeatures = await _fmDecoder.GenerateAsync(
                     solver, textCondition, speechCondition, guidanceScale,
-                    progress => Debug.Log($"[ZipVoiceManager] FM Decoder progress: {progress * 100:F0}%")
+                    null  // 進捗コールバックを無効化（パフォーマンス向上）
                 );
 
-                // デバッグ: FMDecoder出力の統計
+                // 6. プロンプト部分をトリムして生成部分のみを取得
                 float[] melData = melFeatures.DownloadToArray();
-                float melMin = float.MaxValue, melMax = float.MinValue, melSum = 0;
-                for (int i = 0; i < melData.Length; i++)
-                {
-                    melMin = Math.Min(melMin, melData[i]);
-                    melMax = Math.Max(melMax, melData[i]);
-                    melSum += melData[i];
-                }
-                Debug.Log($"[ZipVoiceManager] Mel features stats (before scale): min={melMin:F4}, max={melMax:F4}, mean={melSum / melData.Length:F4}, shape=[{melFeatures.shape[0]}, {melFeatures.shape[1]}, {melFeatures.shape[2]}]");
-
-                // 6. プロンプト部分をトリムして生成部分のみを取得（Pythonと同じ処理）
-                // x = x[:, prompt_features_len:, :] に相当
                 int totalFrames = melFeatures.shape[1];
                 int featDimMel = melFeatures.shape[2];
                 int generatedFrames = totalFrames - promptFeaturesLen;
-                Debug.Log($"[ZipVoiceManager] Trimming prompt portion: total={totalFrames}, prompt={promptFeaturesLen}, generated={generatedFrames}");
 
                 if (generatedFrames <= 0)
                 {
@@ -346,79 +301,60 @@ namespace uZipVoice.Core
                     trimmedMelData
                 );
 
-                // デバッグ: トリム＆スケール復元後の統計
-                melMin = float.MaxValue; melMax = float.MinValue; melSum = 0;
-                for (int i = 0; i < trimmedMelData.Length; i++)
-                {
-                    melMin = Math.Min(melMin, trimmedMelData[i]);
-                    melMax = Math.Max(melMax, trimmedMelData[i]);
-                    melSum += trimmedMelData[i];
-                }
-                Debug.Log($"[ZipVoiceManager] Mel features (trimmed, after scale restore): min={melMin:F4}, max={melMax:F4}, mean={melSum / trimmedMelData.Length:F4}, frames={generatedFrames}");
-
                 // 7. メル特徴量を転置 [1, T, 100] → [1, 100, T]
                 using var melTransposed = Vocos.TransposeMelFeatures(melScaled);
 
-                // 7. Vocosでメル→STFT係数
-                Debug.Log("[ZipVoiceManager] Running Vocos...");
-                using var vocosOutput = _vocos.Execute(melTransposed);
-                await UniTask.Yield(); // UIスレッドに制御を戻す
+                // UIに制御を戻す
+                await UniTask.Yield();
 
-                // 8. ISTFTで波形に変換
-                Debug.Log("[ZipVoiceManager] Running ISTFT...");
+                // 8. Vocosでメル→STFT係数
+                using var vocosOutput = _vocos.Execute(melTransposed);
+
+                // UIに制御を戻す
+                await UniTask.Yield();
+
+                // 9. ISTFTで波形に変換
                 int numBins = vocosOutput.Magnitude.shape[1];
                 int numFrames = vocosOutput.Magnitude.shape[2];
-                Debug.Log($"[ZipVoiceManager] Vocos output: numBins={numBins}, numFrames={numFrames}");
 
                 float[] magnitude = vocosOutput.Magnitude.DownloadToArray();
                 float[] phaseCos = vocosOutput.PhaseCos.DownloadToArray();
                 float[] phaseSin = vocosOutput.PhaseSin.DownloadToArray();
 
-                // デバッグ: Vocos出力の統計
-                float magMin = float.MaxValue, magMax = float.MinValue, magSum = 0;
-                for (int i = 0; i < magnitude.Length; i++)
-                {
-                    magMin = Math.Min(magMin, magnitude[i]);
-                    magMax = Math.Max(magMax, magnitude[i]);
-                    magSum += magnitude[i];
-                }
-                Debug.Log($"[ZipVoiceManager] Magnitude stats: min={magMin:F4}, max={magMax:F4}, mean={magSum / magnitude.Length:F4}");
-
                 float[] waveform = _istftProcessor.Process(magnitude, phaseCos, phaseSin, numBins, numFrames);
 
-                // デバッグ: 波形の統計
+                // UIに制御を戻す
+                await UniTask.Yield();
+
+                // 波形を正規化 (-1.0 〜 1.0)
                 float waveMin = float.MaxValue, waveMax = float.MinValue;
-                int nanCount = 0, infCount = 0;
                 for (int i = 0; i < waveform.Length; i++)
                 {
-                    if (float.IsNaN(waveform[i])) nanCount++;
-                    else if (float.IsInfinity(waveform[i])) infCount++;
-                    else
+                    if (!float.IsNaN(waveform[i]) && !float.IsInfinity(waveform[i]))
                     {
                         waveMin = Math.Min(waveMin, waveform[i]);
                         waveMax = Math.Max(waveMax, waveform[i]);
                     }
                 }
-                Debug.Log($"[ZipVoiceManager] Waveform stats: min={waveMin:F4}, max={waveMax:F4}, length={waveform.Length}, NaN={nanCount}, Inf={infCount}");
 
-                // 波形を正規化 (-1.0 〜 1.0)
                 float absMax = Math.Max(Math.Abs(waveMin), Math.Abs(waveMax));
                 if (absMax > 1e-6f)
                 {
-                    float scale = 0.95f / absMax; // 少しマージンを持たせる
+                    float scale = 0.95f / absMax;
                     for (int i = 0; i < waveform.Length; i++)
                     {
                         waveform[i] *= scale;
                     }
-                    Debug.Log($"[ZipVoiceManager] Waveform normalized with scale={scale:F4}");
                 }
 
-                // 9. AudioClipを作成
+                // 10. AudioClipを作成
                 int sampleRate = Config != null ? Config.SampleRate : 24000;
                 AudioClip clip = AudioClip.Create("Synthesized", waveform.Length, 1, sampleRate, false);
                 clip.SetData(waveform, 0);
 
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
                 Debug.Log($"[ZipVoiceManager] Synthesis complete. Duration: {clip.length:F2}s");
+#endif
 
                 return clip;
             }

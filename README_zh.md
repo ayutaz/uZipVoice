@@ -4,6 +4,10 @@
 
 [English](README.md) | [日本語](README_ja.md) | 中文
 
+## 演示
+
+[![演示视频](https://img.youtube.com/vi/IHXIBUD4ibM/maxresdefault.jpg)](https://youtu.be/IHXIBUD4ibM)
+
 ## 特性
 
 - **零样本TTS**: 仅需几秒参考音频即可生成任意声音
@@ -39,7 +43,11 @@ git clone https://github.com/ayutaz/uZipVoice.git
 
 1. 打开示例场景: `Assets/uZipVoice/Samples/TTSSample.unity`
 2. ONNX模型和tokens.txt已在ZipVoiceManager组件中预配置
-3. 进入Play模式测试语音合成
+3. **零样本声音克隆**: 在Inspector中设置参考音频
+   - 在Hierarchy中选择TTSSampleController
+   - 在Inspector的`Prompt Audio`字段中设置参考AudioClip
+   - 在`Prompt Text`字段中输入参考音频对应的文本
+4. 进入Play模式测试语音合成
 
 ### 编程使用
 

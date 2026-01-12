@@ -4,6 +4,10 @@ Unity implementation of [ZipVoice](https://github.com/k2-fsa/ZipVoice) - a light
 
 English | [日本語](README_ja.md) | [中文](README_zh.md)
 
+## Demo
+
+[![Demo Video](https://img.youtube.com/vi/IHXIBUD4ibM/maxresdefault.jpg)](https://youtu.be/IHXIBUD4ibM)
+
 ## Features
 
 - **Zero-shot TTS**: Generate speech in any voice using just a few seconds of reference audio
@@ -39,7 +43,11 @@ Download ONNX models from [Hugging Face](https://huggingface.co/ayousanz/uZipVoi
 
 1. Open the sample scene: `Assets/uZipVoice/Samples/TTSSample.unity`
 2. ONNX models and tokens.txt are pre-configured in the ZipVoiceManager component
-3. Enter Play mode and test TTS
+3. **Zero-shot Voice Cloning**: Set your reference audio in the Inspector
+   - Select the TTSSampleController in the Hierarchy
+   - Assign your reference AudioClip to the `Prompt Audio` field in the Inspector
+   - Provide the corresponding text for the reference audio in the `Prompt Text` field
+4. Enter Play mode and test TTS
 
 ### Programmatic Usage
 

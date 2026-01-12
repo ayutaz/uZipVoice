@@ -4,6 +4,10 @@
 
 [English](README.md) | 日本語 | [中文](README_zh.md)
 
+## デモ
+
+[![デモ動画](https://img.youtube.com/vi/IHXIBUD4ibM/maxresdefault.jpg)](https://youtu.be/IHXIBUD4ibM)
+
 ## 特徴
 
 - **ゼロショットTTS**: 数秒の参照音声だけで任意の声を生成
@@ -39,7 +43,11 @@ Unity 6でプロジェクトを開きます。依存関係（espeak-ngデータ�
 
 1. サンプルシーンを開く: `Assets/uZipVoice/Samples/TTSSample.unity`
 2. ONNXモデルとtokens.txtはZipVoiceManagerコンポーネントに事前設定済み
-3. Playモードで音声合成をテスト
+3. **ゼロショット音声クローニング**: Inspectorで参照音声を設定
+   - HierarchyでTTSSampleControllerを選択
+   - Inspectorの`Prompt Audio`フィールドに参照用AudioClipを設定
+   - `Prompt Text`フィールドに参照音声に対応するテキストを入力
+4. Playモードで音声合成をテスト
 
 ### プログラムからの使用
 

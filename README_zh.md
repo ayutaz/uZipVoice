@@ -210,6 +210,8 @@ Assets/uZipVoice/
 
 MIT License
 
+**注意**: 本项目使用[espeak-ng](https://github.com/espeak-ng/espeak-ng)（GPLv3）进行文本到音素转换。有关第三方许可证详情，请参阅[THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md)。
+
 ## 致谢
 
 - [ZipVoice](https://github.com/k2-fsa/ZipVoice) - 原始Python实现

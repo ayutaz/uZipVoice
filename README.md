@@ -210,6 +210,8 @@ Run tests via Unity Test Runner (Window > General > Test Runner).
 
 MIT License
 
+**Note**: This project includes [espeak-ng](https://github.com/espeak-ng/espeak-ng) (GPLv3) for text-to-phoneme conversion. Please review [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) for third-party license details.
+
 ## Acknowledgments
 
 - [ZipVoice](https://github.com/k2-fsa/ZipVoice) - Original Python implementation

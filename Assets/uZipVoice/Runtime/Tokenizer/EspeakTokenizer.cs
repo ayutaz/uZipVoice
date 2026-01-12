@@ -201,7 +201,9 @@ namespace uZipVoice.Tokenizer
                     return string.Empty;
                 }
 
-                return allPhonemes.ToString();
+                string result = allPhonemes.ToString();
+                Debug.Log($"[EspeakTokenizer] TextToPhonemes: '{text}' -> '{result}'");
+                return result;
             }
             finally
             {

@@ -14,47 +14,24 @@
 ## 系统要求
 
 - Unity 6 (6000.0.38f1或更高版本)
-- Unity AI Inference Engine 2.4.1+
-- UniTask 2.5.10+
-- NWaves 0.9.6（以DLL形式包含）
-- espeak-ng数据文件（包含在StreamingAssets中）
 
 ## 安装
-
-### 1. 克隆仓库
 
 ```bash
 git clone https://github.com/ayutaz/uZipVoice.git
 ```
 
-### 2. 在Unity中打开
+使用Unity 6打开项目。依赖项（espeak-ng数据、包）都已包含在内。
 
-使用Unity 6打开项目。
+### 设置ONNX模型
 
-### 3. 安装依赖包
-
-以下包将通过OpenUPM自动安装:
-- `com.unity.ai.inference` (2.4.1) - Unity AI Inference Engine
-- `com.cysharp.unitask` (2.5.10) - Unity的async/await支持
-- TextMesh Pro
-
-### 4. 设置ONNX模型
-
-从原始ZipVoice项目导出ONNX模型并放置到`Assets/uZipVoice/Models/`:
+从原始[ZipVoice](https://github.com/Zengyi-Qin/ZipVoice)项目导出ONNX模型并放置到`Assets/uZipVoice/Models/`:
 
 | 文件 | 描述 |
 |-----|------|
 | `text_encoder.onnx` | 文本到条件向量转换 |
 | `fm_decoder.onnx` | Flow Matching解码器 |
 | `vocos_opset15.onnx` | 声码器（梅尔到STFT） |
-
-### 5. 设置espeak-ng数据
-
-将`espeak-ng-data`文件夹复制到`Assets/StreamingAssets/`:
-
-```
-Assets/StreamingAssets/espeak-ng-data/
-```
 
 ## 快速开始
 

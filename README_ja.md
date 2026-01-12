@@ -14,47 +14,24 @@
 ## 動作要件
 
 - Unity 6 (6000.0.38f1以降)
-- Unity AI Inference Engine 2.4.1+
-- UniTask 2.5.10+
-- NWaves 0.9.6（DLLとして同梱）
-- espeak-ngデータファイル（StreamingAssetsに同梱）
 
 ## インストール
-
-### 1. リポジトリのクローン
 
 ```bash
 git clone https://github.com/ayutaz/uZipVoice.git
 ```
 
-### 2. Unityで開く
+Unity 6でプロジェクトを開きます。依存関係（espeak-ngデータ、パッケージ）は同梱されています。
 
-Unity 6でプロジェクトを開きます。
+### ONNXモデルのセットアップ
 
-### 3. 依存パッケージのインストール
-
-以下のパッケージはOpenUPM経由で自動インストールされます:
-- `com.unity.ai.inference` (2.4.1) - Unity AI Inference Engine
-- `com.cysharp.unitask` (2.5.10) - Unity用async/awaitサポート
-- TextMesh Pro
-
-### 4. ONNXモデルのセットアップ
-
-オリジナルのZipVoiceプロジェクトからONNXモデルをエクスポートし、`Assets/uZipVoice/Models/`に配置:
+オリジナルの[ZipVoice](https://github.com/Zengyi-Qin/ZipVoice)プロジェクトからONNXモデルをエクスポートし、`Assets/uZipVoice/Models/`に配置:
 
 | ファイル | 説明 |
 |---------|------|
 | `text_encoder.onnx` | テキスト→条件ベクトル変換 |
 | `fm_decoder.onnx` | Flow Matchingデコーダ |
 | `vocos_opset15.onnx` | ボコーダ（メル→STFT） |
-
-### 5. espeak-ngデータのセットアップ
-
-`espeak-ng-data`フォルダを`Assets/StreamingAssets/`にコピー:
-
-```
-Assets/StreamingAssets/espeak-ng-data/
-```
 
 ## クイックスタート
 

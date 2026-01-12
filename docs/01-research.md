@@ -4,13 +4,16 @@
 
 ZipVoiceは、Flow Matchingベースの高速ゼロショットTTSモデルです。
 
+- **リポジトリ**: https://github.com/k2-fsa/ZipVoice
+- **ONNXモデル**: https://huggingface.co/ayousanz/uZipVoice-onnx
+
 ### モデル構成
 
 | モデル | サイズ | Opset | 役割 |
 |--------|--------|-------|------|
-| text_encoder.onnx | 17MB | 15 | テキスト→条件ベクトル |
-| fm_decoder.onnx | 456MB | 15 | Flow Matchingデコーダ |
-| vocos_opset15.onnx | 52MB | 15 | Vocoder（メル→STFT係数） |
+| text_encoder.onnx | ~3MB | 15 | テキスト→条件ベクトル |
+| fm_decoder.onnx | ~200MB | 15 | Flow Matchingデコーダ |
+| vocos_opset15.onnx | ~50MB | 15 | Vocoder（メル→STFT係数） |
 
 ### 推論パイプライン
 
@@ -43,7 +46,7 @@ waveform [24kHz]
 - 入力:
   - `t` スカラー FLOAT（時刻）
   - `x` [N, T, 100] FLOAT（現在の状態）
-  - `text_condition` [N, T, 100] FLOAT
+  - `text_condition` [N, T, 512] FLOAT
   - `speech_condition` [N, T, 100] FLOAT
   - `guidance_scale` スカラー FLOAT
 - 出力:
@@ -59,21 +62,38 @@ waveform [24kHz]
 
 ---
 
-## 2. Unity AI Inference Engine 2.3
+## 2. Unity AI Inference Engine
 
 ### 概要
-- パッケージ: `com.unity.ai.inference@2.3`
+- パッケージ: `com.unity.ai.inference@2.4.1`
 - 旧名称: Unity Sentis
 - 用途: ONNXモデルの推論実行
 
 ### サポート範囲
 - ONNX Opset: 7-15（ZipVoiceモデルはOpset 15で互換）
 - プラットフォーム: 全Unityサポートプラットフォーム
-- バックエンド: CPU, GPUCompute, GPUPixel
+- バックエンド: CPU, GPUCompute
 
-### 制約事項
-- FFT/IFFT演算子は未サポート
-- ISTFTは外部ライブラリで実装が必要
+### 制約事項（重要）
+
+Unity AI Inference Engineには以下の制約があります：
+
+#### 未サポート演算子
+| 演算子 | 代替手段 |
+|--------|---------|
+| FFT/IFFT | C#で実装（NWavesライブラリ使用） |
+| RFFT/IRFFT | C#で実装 |
+| Log1p | `Log(x + 1)` で代替 |
+| ComplexAbs | 実部・虚部から計算 |
+
+#### テンソル制約
+- 最大次元数: 8次元
+- 動的形状: 一部制限あり（バッチ次元は固定推奨）
+
+#### エクスポート時の注意点
+- Opset 15を使用
+- `torch.fft` 系関数はONNX内で使用不可（Python側で前処理）
+- 複素数演算は実部・虚部に分離
 
 ### 基本API
 
@@ -117,25 +137,16 @@ List: ['h', 'ə', 'l', 'ˈ', 'o', 'ʊ', ' ', 'w', 'ˈ', 'ɜ', 'ː', 'l', 'd']
 | OpenPhonemizer ONNX | ◎ espeak互換 | ◯ | 高 |
 | CMU辞書 + ルール | △ 要変換 | ◯ 純C# | 中 |
 
-### Misaki vs piper_phonemize 比較
+### espeak-ng Unity実装
 
-| テキスト | piper_phonemize | Misaki |
-|---------|-----------------|--------|
-| Hello world. | `həlˈoʊ wˈɜːld.` | `həlˈO wˈɜɹld.` |
-| This is a test. | `ðɪs ɪz ɐ tˈɛst.` | `ðˌɪs ɪz ɐ tˈɛst.` |
-
-**結論**: Misakiは`O`, `W`等の独自記号を使用し、ZipVoiceのtokens.txtと非互換。espeak-ngが最適。
-
-### espeak-ng Unity実装（piper-unity参照）
-
-[skykim/piper-unity](https://github.com/skykim/piper-unity)の実装:
+piper-phonemizeと同等の出力を得るため、espeak-ngのネイティブDLLを使用。
 
 ```csharp
-// ESpeakNG.cs - P/Invokeラッパー
-[DllImport("espeak-ng")]
+// EspeakNative.cs - P/Invokeラッパー
+[DllImport("libespeak-ng")]
 public static extern int espeak_Initialize(int output, int buflength, string path, int options);
 
-[DllImport("espeak-ng")]
+[DllImport("libespeak-ng")]
 public static extern IntPtr espeak_TextToPhonemes(ref IntPtr text, int textmode, int phonememode);
 ```
 
@@ -143,6 +154,14 @@ public static extern IntPtr espeak_TextToPhonemes(ref IntPtr text, int textmode,
 - Windows: `libespeak-ng.dll`
 - macOS: `libespeak-ng.1.dylib`
 - Android: `libespeak-ng.so`
+
+### piper_phonemizeとの差異
+
+| 項目 | piper_phonemize | espeak_TextToPhonemes |
+|------|-----------------|----------------------|
+| 句読点 | 保持 | 出力しない |
+| ストレス記号 | 含む | 含む |
+| 対応 | 末尾句読点を手動追加 | Unity側で実装済み |
 
 ---
 
@@ -164,41 +183,15 @@ public static extern IntPtr espeak_TextToPhonemes(ref IntPtr text, int textmode,
 
 - バージョン: 0.9.6
 - GitHub: https://github.com/ar1st0crat/NWaves
-- インストール方法: NuGet.orgから直接DLLをダウンロードし、Pluginsフォルダに配置
-
-**注意**: OpenUPMのUnityNuGetレジストリにはNWavesが登録されていないため、手動でDLLをダウンロードする必要があります。
-
-```bash
-# NuGet.orgからダウンロード
-curl -L -o nwaves.nupkg "https://www.nuget.org/api/v2/package/NWaves/0.9.6"
-
-# 展開してDLLを取得
-unzip nwaves.nupkg -d nwaves_extracted
-# lib/netstandard2.0/NWaves.dll をPluginsフォルダにコピー
-```
-
-**asmdef設定**:
-```json
-{
-    "overrideReferences": true,
-    "precompiledReferences": [
-        "NWaves.dll"
-    ]
-}
-```
+- 用途: FFT処理のみ使用（ISTFTはカスタム実装）
 
 **使用例**:
 ```csharp
 using NWaves.Transforms;
-using NWaves.Windows;
 
-var stft = new Stft(nFft: 1024, hopSize: 256, WindowType.Hann);
-
-// スペクトログラム: List<(float[] real, float[] imag)>
-var spectrogram = new List<(float[], float[])>();
-// ... フレームごとに(実部, 虚部)を追加 ...
-
-float[] waveform = stft.Inverse(spectrogram);
+var fft = new Fft(nFft);
+fft.Direct(real, imag);  // FFT
+fft.Inverse(real, imag); // IFFT
 ```
 
 ---
@@ -241,10 +234,30 @@ for (int step = 0; step < numStep; step++) {
 
 ---
 
+## 6. FeatureExtractor調査
+
+### メルスペクトログラム抽出
+
+Vocos/ZipVoiceのfbank設定:
+- `power=1`（magnitude spectrum、power spectrumではない）
+- `center=True`（reflect padding適用）
+
+```csharp
+// center=Trueに相当: 信号の両端にn_fft/2のパディング
+int padLength = nFft / 2;
+// reflect padding実装
+
+// マグニチュードスペクトル（power=1）
+float magnitude = Mathf.Sqrt(real * real + imag * imag);
+```
+
+---
+
 ## 参考リンク
 
 - [ZipVoice GitHub](https://github.com/k2-fsa/ZipVoice)
-- [Unity AI Inference Engine 2.3](https://docs.unity3d.com/Packages/com.unity.ai.inference@2.3/manual/)
-- [skykim/piper-unity](https://github.com/skykim/piper-unity)
+- [uZipVoice ONNX Models](https://huggingface.co/ayousanz/uZipVoice-onnx)
+- [Unity AI Inference Engine](https://docs.unity3d.com/Packages/com.unity.ai.inference@2.4/manual/)
+- [Supported ONNX Operators](https://docs.unity3d.com/Packages/com.unity.ai.inference@2.4/manual/supported-operators.html)
 - [NWaves](https://github.com/ar1st0crat/NWaves)
 - [espeak-ng](https://github.com/espeak-ng/espeak-ng)

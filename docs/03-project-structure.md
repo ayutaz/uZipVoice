@@ -5,80 +5,71 @@
 ```
 uZipVoice/
 ├── Assets/
+│   ├── StreamingAssets/
+│   │   └── espeak-ng-data/           # espeak-ng言語データ
+│   │
 │   └── uZipVoice/
-│       ├── Models/                      # ONNXモデル（git管理外）
+│       ├── Models/                    # ONNXモデル（git管理外）
 │       │   ├── text_encoder.onnx
 │       │   ├── fm_decoder.onnx
 │       │   └── vocos_opset15.onnx
 │       │
-│       ├── Runtime/                     # ランタイムスクリプト
+│       ├── Runtime/                   # ランタイムスクリプト
 │       │   ├── Core/
-│       │   │   ├── ZipVoiceManager.cs      # メインAPI
-│       │   │   └── ZipVoiceConfig.cs       # 設定クラス
+│       │   │   ├── ZipVoiceManager.cs
+│       │   │   ├── ZipVoiceConfig.cs
+│       │   │   └── SynthesisOptions.cs
 │       │   │
 │       │   ├── Inference/
-│       │   │   ├── TextEncoder.cs          # Text Encoder推論
-│       │   │   ├── FMDecoder.cs            # FM Decoder推論
-│       │   │   ├── Vocos.cs                # Vocos推論
-│       │   │   └── EulerSolver.cs          # ODE積分
+│       │   │   ├── TextEncoder.cs
+│       │   │   ├── FMDecoder.cs
+│       │   │   ├── Vocos.cs
+│       │   │   └── EulerSolver.cs
 │       │   │
 │       │   ├── Audio/
-│       │   │   ├── ISTFTProcessor.cs       # ISTFT処理（NWaves使用）
-│       │   │   ├── AudioUtility.cs         # オーディオユーティリティ
-│       │   │   └── FeatureExtractor.cs     # メル特徴抽出
+│       │   │   ├── ISTFTProcessor.cs
+│       │   │   └── FeatureExtractor.cs
 │       │   │
 │       │   └── Tokenizer/
-│       │       ├── ITokenizer.cs           # トークナイザーインターフェース
-│       │       ├── EspeakTokenizer.cs      # espeak-ng実装
-│       │       └── TokenMap.cs             # トークンマッピング
+│       │       ├── ITokenizer.cs
+│       │       ├── EspeakNative.cs
+│       │       ├── EspeakTokenizer.cs
+│       │       └── TokenMap.cs
 │       │
-│       ├── Editor/                      # エディタ拡張
-│       │   ├── ZipVoiceEditorWindow.cs     # テスト用エディタウィンドウ
-│       │   └── ModelImporter.cs            # モデルインポート補助
+│       ├── Editor/                    # エディタ拡張
+│       │   └── TTSSampleSceneCreator.cs
 │       │
-│       ├── Plugins/                     # ネイティブプラグイン
-│       │   ├── Windows/
-│       │   │   └── x64/
-│       │   │       └── libespeak-ng.dll
-│       │   ├── macOS/
-│       │   │   └── x64/
-│       │   │       └── libespeak-ng.1.dylib
-│       │   ├── Android/
-│       │   │   └── arm64-v8a/
-│       │   │       └── libespeak-ng.so
-│       │   └── Managed/
-│       │       └── NWaves.dll
+│       ├── Plugins/                   # ネイティブプラグイン
+│       │   ├── NWaves.dll
+│       │   └── Windows/x64/
+│       │       └── libespeak-ng.dll
 │       │
-│       ├── Resources/                   # リソースファイル
-│       │   ├── tokens.txt                  # トークンマッピング
-│       │   └── model.json                  # モデル設定
+│       ├── Resources/                 # リソースファイル
+│       │   └── tokens.txt
 │       │
-│       ├── StreamingAssets/             # ストリーミングアセット
-│       │   └── espeak-ng-data/             # espeak-ng言語データ
+│       ├── Samples/                   # サンプル
+│       │   ├── TTSSample.unity
+│       │   ├── TTSSampleController.cs
+│       │   └── Audio/
+│       │       ├── prompt_english.wav
+│       │       └── prompt_english.txt
 │       │
-│       └── Samples/                     # サンプル
-│           ├── Scenes/
-│           │   └── TTSSample.unity
-│           ├── Scripts/
-│           │   └── TTSSampleController.cs
-│           └── Audio/
-│               └── prompt.wav              # サンプルプロンプト音声
-│
-├── Tests/                              # テスト
+│       └── Tests/                     # テスト
 │           ├── Editor/
 │           │   ├── uZipVoice.Tests.Editor.asmdef
-│           │   ├── TestUtility.cs
 │           │   ├── TokenMapTests.cs
-│           │   └── EulerSolverTests.cs
+│           │   ├── EulerSolverTests.cs
+│           │   └── EspeakTokenizerTests.cs
 │           └── Runtime/
 │               └── uZipVoice.Tests.Runtime.asmdef
 │
-├── docs/                                # ドキュメント
+├── docs/                              # ドキュメント
 │   ├── 01-research.md
 │   ├── 02-architecture.md
 │   ├── 03-project-structure.md
 │   ├── 04-test-specification.md
-│   └── 05-implementation-progress.md
+│   ├── 05-implementation-progress.md
+│   └── 06-onnx-export.md
 │
 ├── Packages/
 │   └── manifest.json
@@ -87,7 +78,10 @@ uZipVoice/
 │
 ├── .gitignore
 ├── .gitattributes
-└── CLAUDE.md
+├── CLAUDE.md
+├── README.md
+├── README_ja.md
+└── README_zh.md
 ```
 
 ---
@@ -104,18 +98,10 @@ public class ZipVoiceManager : MonoBehaviour
     public bool IsProcessing { get; }
 
     // 初期化
-    public async Task InitializeAsync();
+    public async UniTask InitializeAsync();
 
     // 音声合成
-    public async Task<AudioClip> SynthesizeAsync(
-        string text,
-        AudioClip promptAudio,
-        string promptText,
-        SynthesisOptions options = null
-    );
-
-    // 音声合成（ストリーミング）
-    public IAsyncEnumerable<AudioClip> SynthesizeStreamAsync(
+    public async UniTask<AudioClip> SynthesizeAsync(
         string text,
         AudioClip promptAudio,
         string promptText,
@@ -134,79 +120,64 @@ public class SynthesisOptions
 ### ITokenizer（トークナイザーインターフェース）
 
 ```csharp
-public interface ITokenizer
+public interface ITokenizer : IDisposable
 {
     bool IsInitialized { get; }
 
+    void Initialize(string dataPath);
     Task InitializeAsync(string dataPath);
 
     int[] Tokenize(string text);
-
-    string[] TextToPhonemes(string text);
+    string TextToPhonemes(string text);
 }
 ```
 
-### EulerSolver（実装済み）
+### EulerSolver
 
 ```csharp
-namespace uZipVoice.Inference
+public class EulerSolver
 {
-    public class EulerSolver
-    {
-        // プロパティ
-        public int NumSteps { get; }
-        public float TShift { get; }
-        public float TStart { get; }
-        public float TEnd { get; }
+    public int NumSteps { get; }
+    public float TShift { get; }
 
-        // コンストラクタ
-        public EulerSolver(int numSteps, float tShift = 0.5f, float tStart = 0f, float tEnd = 1f);
+    public EulerSolver(int numSteps, float tShift = 0.5f);
 
-        // タイムステップ取得
-        public float[] GetTimesteps();
-        public float GetTimestep(int index);
-        public float GetDt(int stepIndex);
+    public float[] GetTimesteps();
+    public float GetTimestep(int index);
+    public float GetDt(int stepIndex);
 
-        // Euler積分ステップ
-        public float[] Step(float[] x, float[] velocity, int stepIndex);
-        public void StepInPlace(float[] x, float[] velocity, int stepIndex);
-    }
+    public float[] Step(float[] x, float[] velocity, int stepIndex);
+    public void StepInPlace(float[] x, float[] velocity, int stepIndex);
 }
 ```
 
-### TokenMap（実装済み）
+### TokenMap
 
 ```csharp
-namespace uZipVoice.Tokenizer
+public class TokenMap
 {
-    public class TokenMap
-    {
-        // 特殊トークン定数
-        public const string PAD = "_";
-        public const string BOS = "^";
-        public const string EOS = "$";
-        public const string SPACE = " ";
+    // 特殊トークン定数
+    public const string PAD = "_";
+    public const string BOS = "^";
+    public const string EOS = "$";
+    public const string SPACE = " ";
 
-        // プロパティ
-        public int Count { get; }
-        public int PadId { get; }
-        public int BosId { get; }
-        public int EosId { get; }
-        public int SpaceId { get; }
+    // プロパティ
+    public int Count { get; }
+    public int PadId { get; }
+    public int BosId { get; }
+    public int EosId { get; }
+    public int SpaceId { get; }
 
-        // 読み込み
-        public void LoadFromFile(string filePath);
-        public void LoadFromTextAsset(TextAsset textAsset);
-        public void LoadFromString(string content);
+    // 読み込み
+    public void LoadFromTextAsset(TextAsset textAsset);
+    public void LoadFromString(string content);
 
-        // トークン操作
-        public int GetTokenId(string phoneme);
-        public int GetTokenIdOrDefault(string phoneme, int defaultValue = -1);
-        public string GetPhoneme(int id);
-        public bool ContainsPhoneme(string phoneme);
-        public bool ContainsId(int id);
-        public int[] PhonemeToIds(string[] phonemes);
-    }
+    // トークン操作
+    public int GetTokenId(string phoneme);
+    public int GetTokenIdOrDefault(string phoneme, int defaultValue = -1);
+    public string GetPhoneme(int id);
+    public bool ContainsPhoneme(string phoneme);
 }
 ```
 
@@ -227,15 +198,14 @@ uZipVoice
 │   └── EulerSolver
 ├── uZipVoice.Audio
 │   ├── ISTFTProcessor
-│   ├── AudioUtility
 │   └── FeatureExtractor
 ├── uZipVoice.Tokenizer
 │   ├── ITokenizer
+│   ├── EspeakNative
 │   ├── EspeakTokenizer
 │   └── TokenMap
-└── uZipVoice.Editor
-    ├── ZipVoiceEditorWindow
-    └── ModelImporter
+└── uZipVoice.Samples
+    └── TTSSampleController
 ```
 
 ---
@@ -250,27 +220,38 @@ uZipVoice
     "name": "uZipVoice.Runtime",
     "rootNamespace": "uZipVoice",
     "references": [
-        "Unity.InferenceEngine"
+        "Unity.InferenceEngine",
+        "UniTask"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
-    "allowUnsafeCode": true
+    "allowUnsafeCode": true,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "NWaves.dll"
+    ]
 }
 ```
 
-### Editor
+### Tests
 
-**uZipVoice.Editor.asmdef**
+**uZipVoice.Tests.Editor.asmdef**
 ```json
 {
-    "name": "uZipVoice.Editor",
-    "rootNamespace": "uZipVoice.Editor",
+    "name": "uZipVoice.Tests.Editor",
+    "rootNamespace": "uZipVoice.Tests",
     "references": [
         "uZipVoice.Runtime",
-        "Unity.InferenceEngine"
+        "UnityEngine.TestRunner",
+        "UnityEditor.TestRunner"
     ],
     "includePlatforms": ["Editor"],
-    "excludePlatforms": []
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll",
+        "NWaves.dll"
+    ],
+    "defineConstraints": ["UNITY_INCLUDE_TESTS"]
 }
 ```
 
@@ -311,40 +292,22 @@ uZipVoice
 
 ---
 
-## 6. 設定ファイル
+## 6. 実装状況
 
-### model.json
+| コンポーネント | 状態 | テスト |
+|---------------|------|--------|
+| TokenMap | ✅ 完了 | 24テスト |
+| EulerSolver | ✅ 完了 | 32テスト |
+| EspeakTokenizer | ✅ 完了 | 19テスト |
+| TextEncoder | ✅ 完了 | - |
+| FMDecoder | ✅ 完了 | - |
+| Vocos | ✅ 完了 | - |
+| ISTFTProcessor | ✅ 完了 | - |
+| FeatureExtractor | ✅ 完了 | - |
+| ZipVoiceManager | ✅ 完了 | - |
+| TTSSampleController | ✅ 完了 | - |
 
-```json
-{
-  "model": {
-    "fm_decoder_dim": 512,
-    "text_encoder_dim": 192,
-    "feat_dim": 100
-  },
-  "feature": {
-    "sampling_rate": 24000,
-    "type": "vocos"
-  },
-  "audio": {
-    "n_fft": 1024,
-    "hop_length": 256
-  }
-}
-```
-
-### tokens.txt
-
-```
-_   0
-^   1
-$   2
-    3
-h   20
-ə   59
-l   24
-...
-```
+**合計テスト数**: 75テスト（全成功）
 
 ---
 
@@ -356,46 +319,14 @@ l   24
 # Large model files
 *.onnx
 
-# Native plugins (optional)
-# Assets/uZipVoice/Plugins/
-
-# espeak-ng data
-Assets/uZipVoice/StreamingAssets/espeak-ng-data/
+# Unity generated
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
 ```
 
-### Git LFS（推奨）
+### リポジトリ
 
-大容量ファイルを管理する場合:
-
-```
-*.onnx filter=lfs diff=lfs merge=lfs -text
-*.dll filter=lfs diff=lfs merge=lfs -text
-*.dylib filter=lfs diff=lfs merge=lfs -text
-*.so filter=lfs diff=lfs merge=lfs -text
-```
-
----
-
-## 8. 実装優先順位
-
-| 順序 | コンポーネント | 依存関係 | 状態 |
-|------|---------------|---------|------|
-| 1 | プロジェクト基盤 | - | ✅ 完了 |
-| 2 | TokenMap | - | ✅ 完了 |
-| 3 | EulerSolver | - | ✅ 完了 |
-| 4 | EspeakTokenizer | espeak-ng DLL | 🔲 未実装 |
-| 5 | TextEncoder | Inference Engine | 🔲 未実装 |
-| 6 | FMDecoder | EulerSolver | 🔲 未実装 |
-| 7 | Vocos | Inference Engine | 🔲 未実装 |
-| 8 | ISTFTProcessor | NWaves | 🔲 未実装 |
-| 9 | FeatureExtractor | - | 🔲 未実装 |
-| 10 | ZipVoiceManager | 全コンポーネント | 🔲 未実装 |
-| 11 | サンプル・テスト | ZipVoiceManager | 🔲 未実装 |
-
-### テスト実装状況
-
-| コンポーネント | テスト数 | 状態 |
-|--------------|---------|------|
-| TokenMapTests | 24 | ✅ 全テスト成功 |
-| EulerSolverTests | 32 | ✅ 全テスト成功 |
-| 合計 | 56 | ✅ 全テスト成功 |
+- **GitHub**: https://github.com/ayutaz/uZipVoice
+- **ONNX Models**: https://huggingface.co/ayousanz/uZipVoice-onnx

@@ -366,7 +366,7 @@ public class MockTextEncoder
 ### 必要条件
 
 - Unity 6000.0.58f2以上
-- Unity AI Inference Engine 2.3
+- Unity AI Inference Engine 2.4.1
 - Microsoft.CodeAnalysis.CSharp 4.14.0（OpenUPM経由）
 - espeak-ng-data (StreamingAssets) ※EspeakTokenizerテスト用
 - ONNXモデルファイル ※推論テスト用
@@ -414,7 +414,15 @@ public class MockTextEncoder
 
 | 日付 | テスト総数 | 成功 | 失敗 | スキップ |
 |------|-----------|------|------|---------|
-| 2026-01-11 | 56 | 56 | 0 | 0 |
+| 2026-01-12 | 75 | 75 | 0 | 0 |
+
+**テスト内訳**:
+| テストクラス | テスト数 |
+|------------|---------|
+| TokenMapTests | 24 |
+| EulerSolverTests | 32 |
+| EspeakTokenizerTests | 19 |
+| **合計** | **75** |
 
 ---
 

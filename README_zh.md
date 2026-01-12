@@ -25,7 +25,7 @@ git clone https://github.com/ayutaz/uZipVoice.git
 
 ### 设置ONNX模型
 
-从原始[ZipVoice](https://github.com/k2-fsa/ZipVoice)项目导出ONNX模型并放置到`Assets/uZipVoice/Models/`:
+从[Hugging Face](https://huggingface.co/ayousanz/uZipVoice-onnx)下载ONNX模型并放置到`Assets/uZipVoice/Models/`:
 
 | 文件 | 描述 |
 |-----|------|

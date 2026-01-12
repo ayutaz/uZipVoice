@@ -25,7 +25,7 @@ Open the project with Unity 6. All dependencies (espeak-ng data, packages) are i
 
 ### Setup ONNX Models
 
-Export ONNX models from the original [ZipVoice](https://github.com/k2-fsa/ZipVoice) project and place them in `Assets/uZipVoice/Models/`:
+Download ONNX models from [Hugging Face](https://huggingface.co/ayousanz/uZipVoice-onnx) and place them in `Assets/uZipVoice/Models/`:
 
 | File | Description |
 |------|-------------|

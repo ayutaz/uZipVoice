@@ -25,7 +25,7 @@ Unity 6でプロジェクトを開きます。依存関係（espeak-ngデータ�
 
 ### ONNXモデルのセットアップ
 
-オリジナルの[ZipVoice](https://github.com/k2-fsa/ZipVoice)プロジェクトからONNXモデルをエクスポートし、`Assets/uZipVoice/Models/`に配置:
+[Hugging Face](https://huggingface.co/ayousanz/uZipVoice-onnx)からONNXモデルをダウンロードし、`Assets/uZipVoice/Models/`に配置:
 
 | ファイル | 説明 |
 |---------|------|

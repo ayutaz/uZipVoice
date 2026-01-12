@@ -1,6 +1,6 @@
 # uZipVoice
 
-[ZipVoice](https://github.com/Zengyi-Qin/ZipVoice)的Unity实现 - 基于Flow Matching的轻量级零样本语音合成系统。
+[ZipVoice](https://github.com/k2-fsa/ZipVoice)的Unity实现 - 基于Flow Matching的轻量级零样本语音合成系统。
 
 [English](README.md) | [日本語](README_ja.md) | 中文
 
@@ -25,7 +25,7 @@ git clone https://github.com/ayutaz/uZipVoice.git
 
 ### 设置ONNX模型
 
-从原始[ZipVoice](https://github.com/Zengyi-Qin/ZipVoice)项目导出ONNX模型并放置到`Assets/uZipVoice/Models/`:
+从原始[ZipVoice](https://github.com/k2-fsa/ZipVoice)项目导出ONNX模型并放置到`Assets/uZipVoice/Models/`:
 
 | 文件 | 描述 |
 |-----|------|
@@ -212,12 +212,12 @@ MIT License
 
 ## 致谢
 
-- [ZipVoice](https://github.com/Zengyi-Qin/ZipVoice) - 原始Python实现
+- [ZipVoice](https://github.com/k2-fsa/ZipVoice) - 原始Python实现
 - [espeak-ng](https://github.com/espeak-ng/espeak-ng) - 文本到音素转换
 - [Vocos](https://github.com/gemelo-ai/vocos) - 神经声码器
 - [NWaves](https://github.com/ar1st0crat/NWaves) - 用于ISTFT的数字信号处理库
 
 ## 相关项目
 
-- [ZipVoice](https://github.com/Zengyi-Qin/ZipVoice) - 原始实现
+- [ZipVoice](https://github.com/k2-fsa/ZipVoice) - 原始实现
 - [piper-unity](https://github.com/Macoron/piper-unity) - espeak-ng集成参考

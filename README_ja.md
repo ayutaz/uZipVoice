@@ -1,6 +1,6 @@
 # uZipVoice
 
-[ZipVoice](https://github.com/Zengyi-Qin/ZipVoice)のUnity実装 - Flow Matchingを使用した軽量ゼロショット音声合成システム。
+[ZipVoice](https://github.com/k2-fsa/ZipVoice)のUnity実装 - Flow Matchingを使用した軽量ゼロショット音声合成システム。
 
 [English](README.md) | 日本語 | [中文](README_zh.md)
 
@@ -25,7 +25,7 @@ Unity 6でプロジェクトを開きます。依存関係（espeak-ngデータ�
 
 ### ONNXモデルのセットアップ
 
-オリジナルの[ZipVoice](https://github.com/Zengyi-Qin/ZipVoice)プロジェクトからONNXモデルをエクスポートし、`Assets/uZipVoice/Models/`に配置:
+オリジナルの[ZipVoice](https://github.com/k2-fsa/ZipVoice)プロジェクトからONNXモデルをエクスポートし、`Assets/uZipVoice/Models/`に配置:
 
 | ファイル | 説明 |
 |---------|------|
@@ -212,12 +212,12 @@ MIT License
 
 ## 謝辞
 
-- [ZipVoice](https://github.com/Zengyi-Qin/ZipVoice) - オリジナルのPython実装
+- [ZipVoice](https://github.com/k2-fsa/ZipVoice) - オリジナルのPython実装
 - [espeak-ng](https://github.com/espeak-ng/espeak-ng) - テキスト→音素変換
 - [Vocos](https://github.com/gemelo-ai/vocos) - ニューラルボコーダ
 - [NWaves](https://github.com/ar1st0crat/NWaves) - ISTFTのためのデジタル信号処理ライブラリ
 
 ## 関連プロジェクト
 
-- [ZipVoice](https://github.com/Zengyi-Qin/ZipVoice) - オリジナル実装
+- [ZipVoice](https://github.com/k2-fsa/ZipVoice) - オリジナル実装
 - [piper-unity](https://github.com/Macoron/piper-unity) - espeak-ng統合の参考

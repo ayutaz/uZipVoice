@@ -1,6 +1,6 @@
 # uZipVoice
 
-Unity implementation of [ZipVoice](https://github.com/Zengyi-Qin/ZipVoice) - a lightweight zero-shot text-to-speech system using Flow Matching.
+Unity implementation of [ZipVoice](https://github.com/k2-fsa/ZipVoice) - a lightweight zero-shot text-to-speech system using Flow Matching.
 
 English | [日本語](README_ja.md) | [中文](README_zh.md)
 
@@ -25,7 +25,7 @@ Open the project with Unity 6. All dependencies (espeak-ng data, packages) are i
 
 ### Setup ONNX Models
 
-Export ONNX models from the original [ZipVoice](https://github.com/Zengyi-Qin/ZipVoice) project and place them in `Assets/uZipVoice/Models/`:
+Export ONNX models from the original [ZipVoice](https://github.com/k2-fsa/ZipVoice) project and place them in `Assets/uZipVoice/Models/`:
 
 | File | Description |
 |------|-------------|
@@ -212,12 +212,12 @@ MIT License
 
 ## Acknowledgments
 
-- [ZipVoice](https://github.com/Zengyi-Qin/ZipVoice) - Original Python implementation
+- [ZipVoice](https://github.com/k2-fsa/ZipVoice) - Original Python implementation
 - [espeak-ng](https://github.com/espeak-ng/espeak-ng) - Text-to-phoneme conversion
 - [Vocos](https://github.com/gemelo-ai/vocos) - Neural vocoder
 - [NWaves](https://github.com/ar1st0crat/NWaves) - Digital signal processing library for ISTFT
 
 ## Related Projects
 
-- [ZipVoice](https://github.com/Zengyi-Qin/ZipVoice) - Original implementation
+- [ZipVoice](https://github.com/k2-fsa/ZipVoice) - Original implementation
 - [piper-unity](https://github.com/Macoron/piper-unity) - Reference for espeak-ng integration

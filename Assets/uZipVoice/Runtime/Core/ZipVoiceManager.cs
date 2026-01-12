@@ -211,6 +211,13 @@ namespace uZipVoice.Core
                 int[] tokens = _tokenizer.Tokenize(text);
                 int[] promptTokens = _tokenizer.Tokenize(promptText ?? "");
 
+                // DEBUG: Compare with Python values
+                Debug.Log($"[ZipVoiceManager] text_tokens: [{string.Join(", ", tokens)}] ({tokens.Length})");
+                Debug.Log($"[ZipVoiceManager] prompt_tokens: [{string.Join(", ", promptTokens)}] ({promptTokens.Length})");
+                // Python expected:
+                // text_tokens: [20, 59, 24, 120, 27, 100, 35, 120, 62, 122, 24, 17, 10] (13)
+                // prompt_tokens: [41, 74, 31, 74, 38, 50, 31, 120, 39, 25, 28, 59, 24, 28, 88, 120, 51, 122, 25, 28, 32, 32, 120, 61, 23, 31, 32, 10] (28)
+
                 // 2. プロンプト音声からメル特徴量を抽出
                 float[,] promptMel = null;
                 int promptFeaturesLen = 0;
@@ -219,6 +226,12 @@ namespace uZipVoice.Core
                 {
                     promptMel = _featureExtractor.ExtractMelSpectrogram(promptAudio);
                     promptFeaturesLen = promptMel.GetLength(0);
+                    Debug.Log($"[ZipVoiceManager] promptMel shape: [{promptFeaturesLen}, {promptMel.GetLength(1)}]");
+                    // DEBUG: First 5 values of promptMel[0,:]
+                    if (promptFeaturesLen > 0 && promptMel.GetLength(1) >= 5)
+                    {
+                        Debug.Log($"[ZipVoiceManager] promptMel[0,:5] (before scale): [{promptMel[0,0]:F6}, {promptMel[0,1]:F6}, {promptMel[0,2]:F6}, {promptMel[0,3]:F6}, {promptMel[0,4]:F6}]");
+                    }
                 }
                 else
                 {
@@ -231,10 +244,27 @@ namespace uZipVoice.Core
                 }
 
                 // 3. TextEncoderで条件ベクトルを生成
-                Debug.Log("[ZipVoiceManager] Running TextEncoder...");
+                Debug.Log($"[ZipVoiceManager] Running TextEncoder with promptFeaturesLen={promptFeaturesLen}...");
+                // Python expected: prompt_features_len: 648
                 using var textCondition = _textEncoder.Execute(tokens, promptTokens, promptFeaturesLen, speed);
                 Debug.Log($"[ZipVoiceManager] textCondition shape: [{textCondition.shape[0]}, {textCondition.shape[1]}, {textCondition.shape[2]}]");
-                await UniTask.Yield(); // UIスレッドに制御を戻す
+                // Python expected: text_condition shape: (1, 949, 100)
+
+                // DEBUG: TextCondition statistics
+                float[] tcData = textCondition.DownloadToArray();
+                float tcMin = float.MaxValue, tcMax = float.MinValue, tcSum = 0;
+                for (int i = 0; i < tcData.Length; i++)
+                {
+                    tcMin = Math.Min(tcMin, tcData[i]);
+                    tcMax = Math.Max(tcMax, tcData[i]);
+                    tcSum += tcData[i];
+                }
+                Debug.Log($"[ZipVoiceManager] textCondition stats: min={tcMin:F6}, max={tcMax:F6}, mean={tcSum / tcData.Length:F6}");
+                // Python expected: min: -0.224190, max: 0.197560, mean: 0.001326
+                Debug.Log($"[ZipVoiceManager] textCondition[0,0,:5]: [{tcData[0]:F6}, {tcData[1]:F6}, {tcData[2]:F6}, {tcData[3]:F6}, {tcData[4]:F6}]");
+                // Python expected: [-0.007926, 0.000123, 0.001431, 0.001818, -0.000109]
+
+                // NOTE: UniTask.Yield()を削除 - Editorでブロックされる問題を回避
 
                 // 4. 音声条件を作成（プロンプトメル特徴量から）
                 int seqLen = textCondition.shape[1];
@@ -266,6 +296,8 @@ namespace uZipVoice.Core
 
                 // textConditionを [1, T, 512] → [1, T, 100] に変換する必要がある
                 // 実際のモデルの仕様に合わせて調整が必要
+                Debug.Log($"[ZipVoiceManager] Calling FMDecoder.GenerateAsync with numSteps={numSteps}...");
+                var fmStartTime = System.DateTime.Now;
                 using var melFeatures = await _fmDecoder.GenerateAsync(
                     solver, textCondition, speechCondition, guidanceScale,
                     progress => Debug.Log($"[ZipVoiceManager] FM Decoder progress: {progress * 100:F0}%")
@@ -282,24 +314,47 @@ namespace uZipVoice.Core
                 }
                 Debug.Log($"[ZipVoiceManager] Mel features stats (before scale): min={melMin:F4}, max={melMax:F4}, mean={melSum / melData.Length:F4}, shape=[{melFeatures.shape[0]}, {melFeatures.shape[1]}, {melFeatures.shape[2]}]");
 
-                // 6. feat_scaleを元に戻す（Pythonと同じ処理）
-                for (int i = 0; i < melData.Length; i++)
+                // 6. プロンプト部分をトリムして生成部分のみを取得（Pythonと同じ処理）
+                // x = x[:, prompt_features_len:, :] に相当
+                int totalFrames = melFeatures.shape[1];
+                int featDimMel = melFeatures.shape[2];
+                int generatedFrames = totalFrames - promptFeaturesLen;
+                Debug.Log($"[ZipVoiceManager] Trimming prompt portion: total={totalFrames}, prompt={promptFeaturesLen}, generated={generatedFrames}");
+
+                if (generatedFrames <= 0)
                 {
-                    melData[i] /= FeatScale;
+                    throw new InvalidOperationException($"Generated frames ({generatedFrames}) must be positive. Total frames: {totalFrames}, Prompt frames: {promptFeaturesLen}");
                 }
 
-                // スケール復元後のテンソルを作成
-                using var melScaled = new Tensor<float>(melFeatures.shape, melData);
+                // トリムされたメル特徴量を作成
+                float[] trimmedMelData = new float[1 * generatedFrames * featDimMel];
+                for (int t = 0; t < generatedFrames; t++)
+                {
+                    int srcFrame = promptFeaturesLen + t;
+                    for (int f = 0; f < featDimMel; f++)
+                    {
+                        int srcIdx = srcFrame * featDimMel + f;
+                        int dstIdx = t * featDimMel + f;
+                        // feat_scaleを元に戻す（Pythonと同じ処理）
+                        trimmedMelData[dstIdx] = melData[srcIdx] / FeatScale;
+                    }
+                }
 
-                // デバッグ: スケール復元後の統計
+                // スケール復元後のテンソルを作成（トリム済み）
+                using var melScaled = new Tensor<float>(
+                    new TensorShape(1, generatedFrames, featDimMel),
+                    trimmedMelData
+                );
+
+                // デバッグ: トリム＆スケール復元後の統計
                 melMin = float.MaxValue; melMax = float.MinValue; melSum = 0;
-                for (int i = 0; i < melData.Length; i++)
+                for (int i = 0; i < trimmedMelData.Length; i++)
                 {
-                    melMin = Math.Min(melMin, melData[i]);
-                    melMax = Math.Max(melMax, melData[i]);
-                    melSum += melData[i];
+                    melMin = Math.Min(melMin, trimmedMelData[i]);
+                    melMax = Math.Max(melMax, trimmedMelData[i]);
+                    melSum += trimmedMelData[i];
                 }
-                Debug.Log($"[ZipVoiceManager] Mel features stats (after scale): min={melMin:F4}, max={melMax:F4}, mean={melSum / melData.Length:F4}");
+                Debug.Log($"[ZipVoiceManager] Mel features (trimmed, after scale restore): min={melMin:F4}, max={melMax:F4}, mean={melSum / trimmedMelData.Length:F4}, frames={generatedFrames}");
 
                 // 7. メル特徴量を転置 [1, T, 100] → [1, 100, T]
                 using var melTransposed = Vocos.TransposeMelFeatures(melScaled);

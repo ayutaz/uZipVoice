@@ -5,6 +5,22 @@ using UnityEngine;
 namespace uZipVoice.Audio
 {
     /// <summary>
+    /// パディングタイプ
+    /// </summary>
+    public enum ISTFTPadding
+    {
+        /// <summary>
+        /// center padding - torch.istft(center=True)と同じ。出力をn_fft//2でトリム
+        /// </summary>
+        Center,
+
+        /// <summary>
+        /// same padding - カスタム実装。トリムなし
+        /// </summary>
+        Same
+    }
+
+    /// <summary>
     /// ISTFT (Inverse Short-Time Fourier Transform) プロセッサ
     /// Vocosの出力（magnitude, phase_cos, phase_sin）から波形を生成
     /// NWaves FFTを使用した手動overlap-add実装
@@ -15,6 +31,7 @@ namespace uZipVoice.Audio
         private readonly int _hopLength;
         private readonly float[] _window;
         private readonly Fft _fft;
+        private readonly ISTFTPadding _padding;
 
         /// <summary>
         /// FFTサイズ
@@ -27,11 +44,17 @@ namespace uZipVoice.Audio
         public int HopLength => _hopLength;
 
         /// <summary>
+        /// パディングタイプ
+        /// </summary>
+        public ISTFTPadding Padding => _padding;
+
+        /// <summary>
         /// コンストラクタ
         /// </summary>
         /// <param name="nFft">FFTサイズ（デフォルト: 1024）</param>
         /// <param name="hopLength">ホップ長（デフォルト: 256）</param>
-        public ISTFTProcessor(int nFft = 1024, int hopLength = 256)
+        /// <param name="padding">パディングタイプ（デフォルト: Center - Vocosで使用）</param>
+        public ISTFTProcessor(int nFft = 1024, int hopLength = 256, ISTFTPadding padding = ISTFTPadding.Center)
         {
             if (nFft <= 0)
             {
@@ -50,8 +73,9 @@ namespace uZipVoice.Audio
 
             _nFft = nFft;
             _hopLength = hopLength;
+            _padding = padding;
 
-            // Hann窓を作成
+            // Hann窓を作成（periodic=True相当: 分母にnFftを使用）
             _window = new float[nFft];
             for (int i = 0; i < nFft; i++)
             {
@@ -88,10 +112,10 @@ namespace uZipVoice.Audio
                 throw new ArgumentNullException(nameof(phaseSin));
             }
 
-            // 出力波形のサイズを計算
-            int outputLength = (numFrames - 1) * _hopLength + _nFft;
-            float[] output = new float[outputLength];
-            float[] windowSum = new float[outputLength];
+            // 出力波形のサイズを計算（center paddingの場合、後でトリムする）
+            int fullLength = (numFrames - 1) * _hopLength + _nFft;
+            float[] output = new float[fullLength];
+            float[] windowSum = new float[fullLength];
 
             // 各フレームを処理してoverlap-add
             float[] realSpectrum = new float[_nFft];
@@ -132,15 +156,17 @@ namespace uZipVoice.Audio
                 // IFFTを実行（in-place）
                 _fft.Inverse(realSpectrum, imagSpectrum);
 
-                // NWaves FftはIFFT結果を正規化しないため、nFftで割る
+                // NWaves FFTのIFFTは正規化しない（torch.fft.irfft(norm="backward")と同じ）
+                // PyTorch istftの内部実装に合わせて、ここで1/nFftの正規化を適用
                 float normFactor = 1.0f / _nFft;
 
                 // 窓関数を適用してoverlap-add
+                // PyTorch istftと同様: IFFT結果に窓関数を掛けてoverlap-add
                 int frameStart = frame * _hopLength;
                 for (int i = 0; i < _nFft; i++)
                 {
                     int outIdx = frameStart + i;
-                    if (outIdx < outputLength)
+                    if (outIdx < fullLength)
                     {
                         // IFFT結果の実部のみを使用（虚部は理論上ゼロ）
                         float sample = realSpectrum[i] * normFactor;
@@ -152,17 +178,44 @@ namespace uZipVoice.Audio
 
             // 窓関数の二乗和で正規化（COLA条件）
             // 境界部分では窓関数の和が小さいため、最小閾値を設定
-            // Hann窓で4倍オーバーラップの場合、中央部分のwindowSumは約1.5
-            float minWindowSum = 0.5f;
-            for (int i = 0; i < outputLength; i++)
+            // Hann窓で4倍オーバーラップ（hopLength=nFft/4）の場合、中央部分のwindowSumは約1.5
+            float minWindowSum = 1e-8f;
+            for (int i = 0; i < fullLength; i++)
             {
-                float ws = Math.Max(windowSum[i], minWindowSum);
-                output[i] /= ws;
+                if (windowSum[i] > minWindowSum)
+                {
+                    output[i] /= windowSum[i];
+                }
             }
 
-            Debug.Log($"[ISTFTProcessor] ISTFT completed. Output length: {outputLength}, frames: {numFrames}");
+            // Center paddingの場合、出力をトリム
+            // STFTでcenter=Trueの場合、入力の両端にn_fft//2のパディングが追加される
+            // ISTFTではそのパディング分を削除する必要がある
+            float[] result;
+            if (_padding == ISTFTPadding.Center)
+            {
+                int pad = _nFft / 2;
+                int trimmedLength = fullLength - 2 * pad;
+                if (trimmedLength > 0)
+                {
+                    result = new float[trimmedLength];
+                    Array.Copy(output, pad, result, 0, trimmedLength);
+                    Debug.Log($"[ISTFTProcessor] ISTFT completed (center padding). Full length: {fullLength}, Trimmed length: {trimmedLength}, frames: {numFrames}");
+                }
+                else
+                {
+                    // トリム後の長さが0以下の場合は全出力を返す
+                    result = output;
+                    Debug.LogWarning($"[ISTFTProcessor] Trimmed length would be non-positive ({trimmedLength}). Returning full output.");
+                }
+            }
+            else
+            {
+                result = output;
+                Debug.Log($"[ISTFTProcessor] ISTFT completed (same padding). Output length: {fullLength}, frames: {numFrames}");
+            }
 
-            return output;
+            return result;
         }
     }
 }

@@ -839,7 +839,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: "This is a test of the text to speech system.\u200B"
+  m_text: "This is a sample prompt text.\u200B"
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -1606,7 +1606,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: "Hello, this is a test of the text to speech system.\u200B"
+  m_text: "Hello world.\u200B"
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -2074,7 +2074,7 @@ MonoBehaviour:
   VocosModel: {fileID: 5022602860645237092, guid: 44884284599ad5f469e534acb25e94c0, type: 3}
   TokensAsset: {fileID: 4900000, guid: 10081b84b4cfddc47aaf03893f9bff71, type: 3}
   Config: {fileID: 0}
-  Backend: 256
+  Backend: 0
 --- !u!4 &630837755
 Transform:
   m_ObjectHideFlags: 0
@@ -2760,7 +2760,7 @@ MonoBehaviour:
   m_CaretColor: {r: 0.19607843, g: 0.19607843, b: 0.19607843, a: 1}
   m_CustomCaretColor: 0
   m_SelectionColor: {r: 0.65882355, g: 0.80784315, b: 1, a: 0.7529412}
-  m_Text: Hello, this is a test of the text to speech system.
+  m_Text: Hello world.
   m_CaretBlinkRate: 0.85
   m_CaretWidth: 1
   m_ReadOnly: 0
@@ -4181,7 +4181,7 @@ MonoBehaviour:
   _playButton: {fileID: 367443811}
   _stopButton: {fileID: 1343972223}
   _audioSource: {fileID: 630837753}
-  _promptAudioClip: {fileID: 8300000, guid: 86e4f12833edb3f489bab4777efdb18f, type: 3}
+  _promptAudioClip: {fileID: 8300000, guid: 710073d430af0a5408516322a0808be3, type: 3}
 --- !u!4 &1719429546
 Transform:
   m_ObjectHideFlags: 0
@@ -4550,7 +4550,7 @@ MonoBehaviour:
   m_CaretColor: {r: 0.19607843, g: 0.19607843, b: 0.19607843, a: 1}
   m_CustomCaretColor: 0
   m_SelectionColor: {r: 0.65882355, g: 0.80784315, b: 1, a: 0.7529412}
-  m_Text: This is a test of the text to speech system.
+  m_Text: This is a sample prompt text.
   m_CaretBlinkRate: 0.85
   m_CaretWidth: 1
   m_ReadOnly: 0

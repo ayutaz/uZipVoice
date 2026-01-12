@@ -104,7 +104,8 @@ namespace uZipVoice.Samples
 
             if (_promptTextInput != null && string.IsNullOrEmpty(_promptTextInput.text))
             {
-                _promptTextInput.text = "This is a sample prompt text.";
+                // prompt_english.wav の書き起こしテキスト
+                _promptTextInput.text = "Hello, my name is Sarah. I am a voice assistant.";
             }
 
             UpdateStatus("Initializing...");

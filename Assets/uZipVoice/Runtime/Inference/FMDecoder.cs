@@ -157,14 +157,20 @@ namespace uZipVoice.Inference
 
             float[] timesteps = solver.GetTimesteps();
 
+            Debug.Log($"[FMDecoder] Starting Euler integration: {solver.NumSteps} steps, seqLen={seqLen}");
+            var stepWatch = new System.Diagnostics.Stopwatch();
+
             // Euler積分ループ（バッファ再利用で高速化）
             for (int step = 0; step < solver.NumSteps; step++)
             {
+                stepWatch.Restart();
                 float t = timesteps[step];
                 float dt = solver.GetDt(step);
 
                 // 速度を計算
+                Debug.Log($"[FMDecoder] Step {step + 1}/{solver.NumSteps}: t={t:F4}, calling ExecuteStep...");
                 using var velocity = ExecuteStep(t, x, textCondition, speechCondition, guidanceScale);
+                Debug.Log($"[FMDecoder] Step {step + 1}: ExecuteStep took {stepWatch.ElapsedMilliseconds}ms");
 
                 // 速度データを取得
                 var vData = velocity.DownloadToArray();
@@ -184,12 +190,7 @@ namespace uZipVoice.Inference
 
                 // 進捗を報告
                 onProgress?.Invoke((float)(step + 1) / solver.NumSteps);
-
-                // 4ステップごとにUIスレッドに制御を戻す（フリーズ防止、頻度を下げて高速化）
-                if (step % 4 == 0)
-                {
-                    await UniTask.Yield();
-                }
+                // NOTE: UniTask.Yield()を削除 - Editorでブロックされる問題を回避
             }
 
             return x;

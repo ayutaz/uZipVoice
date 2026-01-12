@@ -28,17 +28,19 @@ namespace uZipVoice.Tests
             // Assert
             Assert.That(processor.NFft, Is.EqualTo(DefaultNFft));
             Assert.That(processor.HopLength, Is.EqualTo(DefaultHopLength));
+            Assert.That(processor.Padding, Is.EqualTo(ISTFTPadding.Center));
         }
 
         [Test]
         public void Constructor_CustomParams_CreatesProcessor()
         {
             // Act
-            var processor = new ISTFTProcessor(nFft: 512, hopLength: 128);
+            var processor = new ISTFTProcessor(nFft: 512, hopLength: 128, padding: ISTFTPadding.Same);
 
             // Assert
             Assert.That(processor.NFft, Is.EqualTo(512));
             Assert.That(processor.HopLength, Is.EqualTo(128));
+            Assert.That(processor.Padding, Is.EqualTo(ISTFTPadding.Same));
         }
 
         [Test]
@@ -110,7 +112,8 @@ namespace uZipVoice.Tests
         public void Process_DCSignal_ReturnsConstantOutput()
         {
             // Arrange: DC signal (magnitude at bin 0 only)
-            var processor = new ISTFTProcessor(nFft: 256, hopLength: 64);
+            // Use Same padding to get full output without trimming
+            var processor = new ISTFTProcessor(nFft: 256, hopLength: 64, padding: ISTFTPadding.Same);
             int numBins = 129; // 256/2 + 1
             int numFrames = 4;
             int totalSize = numBins * numFrames;
@@ -152,8 +155,8 @@ namespace uZipVoice.Tests
         [Test]
         public void Process_SingleFrame_ReturnsCorrectLength()
         {
-            // Arrange
-            var processor = new ISTFTProcessor(nFft: 256, hopLength: 64);
+            // Arrange - use Same padding to check exact output length
+            var processor = new ISTFTProcessor(nFft: 256, hopLength: 64, padding: ISTFTPadding.Same);
             int numBins = 129;
             int numFrames = 1;
 
@@ -176,8 +179,8 @@ namespace uZipVoice.Tests
         [Test]
         public void Process_MultipleFrames_ReturnsCorrectLength()
         {
-            // Arrange
-            var processor = new ISTFTProcessor(nFft: 256, hopLength: 64);
+            // Arrange - use Same padding to check exact output length
+            var processor = new ISTFTProcessor(nFft: 256, hopLength: 64, padding: ISTFTPadding.Same);
             int numBins = 129;
             int numFrames = 10;
 
@@ -253,8 +256,8 @@ namespace uZipVoice.Tests
                 }
             }
 
-            // Perform ISTFT
-            var processor = new ISTFTProcessor(nFft, hopLength);
+            // Perform ISTFT (use Same padding to match NWaves STFT behavior)
+            var processor = new ISTFTProcessor(nFft, hopLength, ISTFTPadding.Same);
             float[] reconstructed = processor.Process(magnitude, phaseCos, phaseSin, numBins, numFrames);
 
             // Assert: Compare reconstructed signal with original
@@ -340,8 +343,8 @@ namespace uZipVoice.Tests
                 }
             }
 
-            // Perform ISTFT
-            var processor = new ISTFTProcessor(nFft, hopLength);
+            // Perform ISTFT (use Same padding to match NWaves STFT behavior)
+            var processor = new ISTFTProcessor(nFft, hopLength, ISTFTPadding.Same);
             float[] reconstructed = processor.Process(magnitude, phaseCos, phaseSin, numBins, numFrames);
 
             // Calculate reconstructed energy (central portion)
@@ -506,12 +509,13 @@ namespace uZipVoice.Tests
         public void Process_VocosLikeOutput_ProducesValidWaveform()
         {
             // Simulate Vocos output format
+            // Use Center padding as Vocos uses center=True
             int nFft = 1024;
             int hopLength = 256;
             int numBins = 513;
-            int numFrames = 10;
+            int numFrames = 100; // Increased to ensure enough frames after trimming
 
-            var processor = new ISTFTProcessor(nFft, hopLength);
+            var processor = new ISTFTProcessor(nFft, hopLength, ISTFTPadding.Center);
 
             // Create Vocos-like output: magnitude with typical speech-like pattern
             float[] magnitude = new float[numBins * numFrames];
@@ -579,7 +583,7 @@ namespace uZipVoice.Tests
             int numBins = 129;
             int numFrames = 8;
 
-            var processor = new ISTFTProcessor(nFft, hopLength);
+            var processor = new ISTFTProcessor(nFft, hopLength, ISTFTPadding.Same);
 
             // Create constant magnitude across all frames
             float[] magnitude = new float[numBins * numFrames];
@@ -626,7 +630,7 @@ namespace uZipVoice.Tests
             int numBins = 129;
             int numFrames = 1;
 
-            var processor = new ISTFTProcessor(nFft, hopLength);
+            var processor = new ISTFTProcessor(nFft, hopLength, ISTFTPadding.Same);
 
             // All ones in spectrum
             float[] magnitude = new float[numBins];

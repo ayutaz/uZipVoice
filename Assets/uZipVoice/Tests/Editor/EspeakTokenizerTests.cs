@@ -100,9 +100,8 @@ namespace uZipVoice.Tests
 
             // Assert
             Assert.That(tokens, Is.Not.Null);
-            Assert.That(tokens.Length, Is.GreaterThan(2)); // At least BOS + EOS + some phonemes
-            Assert.That(tokens[0], Is.EqualTo(_tokenMap.BosId)); // Starts with BOS
-            Assert.That(tokens[^1], Is.EqualTo(_tokenMap.EosId)); // Ends with EOS
+            Assert.That(tokens.Length, Is.GreaterThan(0)); // At least some phoneme tokens
+            // NOTE: Python互換のため、BOS/EOSトークンは追加されない
         }
 
         #endregion
@@ -110,7 +109,7 @@ namespace uZipVoice.Tests
         #region ET-009: Tokenize_EmptyText
 
         [Test]
-        public void Tokenize_EmptyText_ReturnsBosEos()
+        public void Tokenize_EmptyText_ReturnsEmptyArray()
         {
             if (!_espeakAvailable)
             {
@@ -123,12 +122,12 @@ namespace uZipVoice.Tests
             // Act
             int[] tokens = _tokenizer.Tokenize("");
 
-            // Assert
-            Assert.That(tokens, Is.EqualTo(new[] { _tokenMap.BosId, _tokenMap.EosId }));
+            // Assert - Python互換のため、空配列を返す
+            Assert.That(tokens, Is.Empty);
         }
 
         [Test]
-        public void Tokenize_NullText_ReturnsBosEos()
+        public void Tokenize_NullText_ReturnsEmptyArray()
         {
             if (!_espeakAvailable)
             {
@@ -141,8 +140,8 @@ namespace uZipVoice.Tests
             // Act
             int[] tokens = _tokenizer.Tokenize(null);
 
-            // Assert
-            Assert.That(tokens, Is.EqualTo(new[] { _tokenMap.BosId, _tokenMap.EosId }));
+            // Assert - Python互換のため、空配列を返す
+            Assert.That(tokens, Is.Empty);
         }
 
         #endregion
@@ -158,49 +157,45 @@ namespace uZipVoice.Tests
             // Act
             int[] tokens = _tokenizer.PhonemeStringToTokens(phonemes);
 
-            // Assert
-            Assert.That(tokens[0], Is.EqualTo(_tokenMap.BosId)); // BOS
-            Assert.That(tokens[1], Is.EqualTo(20)); // h
-            Assert.That(tokens[2], Is.EqualTo(59)); // ə
-            Assert.That(tokens[^1], Is.EqualTo(_tokenMap.EosId)); // EOS
+            // Assert - Python互換のため、BOS/EOSなし
+            Assert.That(tokens.Length, Is.EqualTo(2));
+            Assert.That(tokens[0], Is.EqualTo(20)); // h
+            Assert.That(tokens[1], Is.EqualTo(59)); // ə
         }
 
         [Test]
-        public void PhonemeStringToTokens_EmptyString_ReturnsBosEos()
+        public void PhonemeStringToTokens_EmptyString_ReturnsEmptyArray()
         {
             // Act
             int[] tokens = _tokenizer.PhonemeStringToTokens("");
 
-            // Assert
-            Assert.That(tokens, Is.EqualTo(new[] { _tokenMap.BosId, _tokenMap.EosId }));
+            // Assert - Python互換のため、空配列
+            Assert.That(tokens, Is.Empty);
         }
 
         [Test]
-        public void PhonemeStringToTokens_NullString_ReturnsBosEos()
+        public void PhonemeStringToTokens_NullString_ReturnsEmptyArray()
         {
             // Act
             int[] tokens = _tokenizer.PhonemeStringToTokens(null);
 
-            // Assert
-            Assert.That(tokens, Is.EqualTo(new[] { _tokenMap.BosId, _tokenMap.EosId }));
+            // Assert - Python互換のため、空配列
+            Assert.That(tokens, Is.Empty);
         }
 
         [Test]
         public void PhonemeStringToTokens_UnknownPhonemes_SkipsUnknown()
         {
-            // Arrange - 'x'はTestUtilityで定義されていない、hは定義されている
+            // Arrange - 'X'はTestUtilityで定義されていない、hは定義されている
             string phonemes = "hXh";
 
             // Act
             int[] tokens = _tokenizer.PhonemeStringToTokens(phonemes);
 
-            // Assert
-            // BOS, h, h, EOS (Xはスキップされる)
-            Assert.That(tokens.Length, Is.EqualTo(4));
-            Assert.That(tokens[0], Is.EqualTo(_tokenMap.BosId));
+            // Assert - h, h (Xはスキップされる、BOS/EOSなし)
+            Assert.That(tokens.Length, Is.EqualTo(2));
+            Assert.That(tokens[0], Is.EqualTo(20)); // h
             Assert.That(tokens[1], Is.EqualTo(20)); // h
-            Assert.That(tokens[2], Is.EqualTo(20)); // h
-            Assert.That(tokens[3], Is.EqualTo(_tokenMap.EosId));
         }
 
         #endregion
@@ -317,8 +312,9 @@ namespace uZipVoice.Tests
             var tokenizer = new EspeakTokenizer(tokenMap);
             int[] tokens = tokenizer.PhonemeStringToTokens("h");
 
-            // Assert
-            Assert.That(tokens[1], Is.EqualTo(20)); // h
+            // Assert - Python互換のため、BOS/EOSなし
+            Assert.That(tokens.Length, Is.EqualTo(1));
+            Assert.That(tokens[0], Is.EqualTo(20)); // h
             tokenizer.Dispose();
         }
 
@@ -331,6 +327,119 @@ namespace uZipVoice.Tests
         {
             // Assert
             Assert.That(_tokenizer.IsInitialized, Is.False);
+        }
+
+        #endregion
+
+        #region Integration Tests with Real tokens.txt
+
+        [Test]
+        public void Tokenize_HelloWithRealTokens_ProducesReasonableTokenCount()
+        {
+            if (!_espeakAvailable)
+            {
+                Assert.Ignore("espeak-ng-data not available");
+            }
+
+            // Use real tokens.txt
+            string tokensPath = System.IO.Path.Combine(Application.dataPath, "uZipVoice/Resources/tokens.txt");
+            if (!System.IO.File.Exists(tokensPath))
+            {
+                Assert.Ignore("Real tokens.txt not found");
+            }
+
+            var realTokenMap = new TokenMap();
+            realTokenMap.LoadFromString(System.IO.File.ReadAllText(tokensPath));
+            var realTokenizer = new EspeakTokenizer(realTokenMap);
+
+            try
+            {
+                realTokenizer.Initialize(_espeakDataPath);
+
+                // Act
+                int[] tokens = realTokenizer.Tokenize("hello");
+
+                // Assert - "hello" should produce ~3-6 phoneme tokens (h, ə, l, oʊ or similar)
+                // Python互換のため、BOS/EOSトークンは追加されない
+                Assert.That(tokens.Length, Is.GreaterThanOrEqualTo(3),
+                    $"'hello' should produce at least 3 tokens but got {tokens.Length}");
+
+                Debug.Log($"[Test] 'hello' produced {tokens.Length} tokens: [{string.Join(", ", tokens)}]");
+            }
+            finally
+            {
+                realTokenizer.Dispose();
+            }
+        }
+
+        [Test]
+        public void Tokenize_LongSentenceWithRealTokens_ProducesExpectedTokenCount()
+        {
+            if (!_espeakAvailable)
+            {
+                Assert.Ignore("espeak-ng-data not available");
+            }
+
+            // Use real tokens.txt
+            string tokensPath = System.IO.Path.Combine(Application.dataPath, "uZipVoice/Resources/tokens.txt");
+            if (!System.IO.File.Exists(tokensPath))
+            {
+                Assert.Ignore("Real tokens.txt not found");
+            }
+
+            var realTokenMap = new TokenMap();
+            realTokenMap.LoadFromString(System.IO.File.ReadAllText(tokensPath));
+            var realTokenizer = new EspeakTokenizer(realTokenMap);
+
+            try
+            {
+                realTokenizer.Initialize(_espeakDataPath);
+
+                // Act - This is the sentence that was producing only 8 tokens
+                string testSentence = "Hello, this is a test of the text to speech system.";
+                int[] tokens = realTokenizer.Tokenize(testSentence);
+
+                // Assert - This sentence should produce ~40-60 phoneme tokens
+                // If it produces less than 20, something is wrong
+                Assert.That(tokens.Length, Is.GreaterThanOrEqualTo(20),
+                    $"'{testSentence}' should produce at least 20 tokens but got {tokens.Length}");
+
+                Debug.Log($"[Test] Long sentence produced {tokens.Length} tokens");
+            }
+            finally
+            {
+                realTokenizer.Dispose();
+            }
+        }
+
+        [Test]
+        public void TextToPhonemes_Hello_ReturnsValidPhonemes()
+        {
+            if (!_espeakAvailable)
+            {
+                Assert.Ignore("espeak-ng-data not available");
+            }
+
+            // Arrange
+            _tokenizer.Initialize(_espeakDataPath);
+
+            // Act
+            string phonemes = _tokenizer.TextToPhonemes("hello");
+
+            // Assert - should return something like "həˈloʊ" or similar
+            Assert.That(phonemes, Is.Not.Null.And.Not.Empty, "Phonemes should not be empty");
+            Assert.That(phonemes.Length, Is.GreaterThanOrEqualTo(3),
+                $"'hello' phonemes should have at least 3 characters but got '{phonemes}' ({phonemes.Length} chars)");
+
+            Debug.Log($"[Test] 'hello' phonemes: '{phonemes}' ({phonemes.Length} chars)");
+
+            // Log Unicode code points for debugging
+            var codePoints = new System.Collections.Generic.List<string>();
+            foreach (char c in phonemes)
+            {
+                codePoints.Add($"'{c}'(U+{((int)c):X4})");
+            }
+            Debug.Log($"[Test] Phoneme code points: {string.Join(", ", codePoints)}");
         }
 
         #endregion

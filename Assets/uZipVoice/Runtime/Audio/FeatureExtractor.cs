@@ -82,6 +82,7 @@ namespace uZipVoice.Audio
 
         /// <summary>
         /// 音声波形からメルスペクトログラムを抽出
+        /// center=True相当のパディングを適用（Pythonと同じ動作）
         /// </summary>
         /// <param name="audio">音声波形</param>
         /// <returns>メルスペクトログラム [numFrames, nMels]</returns>
@@ -92,8 +93,30 @@ namespace uZipVoice.Audio
                 throw new ArgumentException("Audio cannot be null or empty", nameof(audio));
             }
 
-            // フレーム数を計算
-            int numFrames = (audio.Length - _nFft) / _hopLength + 1;
+            // center=Trueに相当: 信号の両端にn_fft/2のパディングを追加
+            // PyTorchはreflect paddingを使用
+            int padLength = _nFft / 2;
+            float[] paddedAudio = new float[audio.Length + 2 * padLength];
+
+            // 左側のreflect padding
+            for (int i = 0; i < padLength; i++)
+            {
+                int srcIdx = padLength - i;
+                paddedAudio[i] = srcIdx < audio.Length ? audio[srcIdx] : 0f;
+            }
+
+            // 中央部分をコピー
+            Array.Copy(audio, 0, paddedAudio, padLength, audio.Length);
+
+            // 右側のreflect padding
+            for (int i = 0; i < padLength; i++)
+            {
+                int srcIdx = audio.Length - 2 - i;
+                paddedAudio[padLength + audio.Length + i] = srcIdx >= 0 ? audio[srcIdx] : 0f;
+            }
+
+            // パディング後の信号でフレーム数を計算
+            int numFrames = (paddedAudio.Length - _nFft) / _hopLength + 1;
             if (numFrames <= 0)
             {
                 numFrames = 1;
@@ -114,7 +137,7 @@ namespace uZipVoice.Audio
                 for (int i = 0; i < _nFft; i++)
                 {
                     int sampleIdx = startSample + i;
-                    frame[i] = sampleIdx < audio.Length ? audio[sampleIdx] * _window[i] : 0f;
+                    frame[i] = sampleIdx < paddedAudio.Length ? paddedAudio[sampleIdx] * _window[i] : 0f;
                 }
 
                 // FFTを実行（NWaves使用）
@@ -122,11 +145,12 @@ namespace uZipVoice.Audio
                 Array.Clear(imag, 0, _nFft);
                 _fft.Direct(real, imag);
 
-                // パワースペクトルを計算
-                float[] powerSpec = new float[numBins];
+                // マグニチュードスペクトルを計算（power=1に相当、Pythonと同じ）
+                // NOTE: VocosFbankはpower=1を使用（magnitude spectrum）
+                float[] magSpec = new float[numBins];
                 for (int bin = 0; bin < numBins; bin++)
                 {
-                    powerSpec[bin] = real[bin] * real[bin] + imag[bin] * imag[bin];
+                    magSpec[bin] = Mathf.Sqrt(real[bin] * real[bin] + imag[bin] * imag[bin]);
                 }
 
                 // メルフィルターバンクを適用
@@ -135,10 +159,10 @@ namespace uZipVoice.Audio
                     float sum = 0;
                     for (int bin = 0; bin < numBins; bin++)
                     {
-                        sum += powerSpec[bin] * _melFilterbank[mel, bin];
+                        sum += magSpec[bin] * _melFilterbank[mel, bin];
                     }
-                    // 対数スケールに変換
-                    melSpec[f, mel] = Mathf.Log(Mathf.Max(sum, 1e-10f));
+                    // 対数スケールに変換（clamp min=1e-7はPythonと同じ）
+                    melSpec[f, mel] = Mathf.Log(Mathf.Max(sum, 1e-7f));
                 }
             }
 

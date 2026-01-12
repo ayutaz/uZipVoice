@@ -154,21 +154,54 @@ namespace uZipVoice.Tokenizer
                 Marshal.Copy(textBytes, 0, textPtr, textBytes.Length);
 
                 IntPtr pointerToText = textPtr;
+                var allPhonemes = new StringBuilder();
 
-                // IPA音素に変換
-                IntPtr resultPtr = EspeakNative.espeak_TextToPhonemes(
-                    ref pointerToText,
-                    EspeakNative.CHARS_AUTO,
-                    EspeakNative.PHONEMES_IPA
-                );
+                // espeak_TextToPhonemes は1回の呼び出しで1節/句だけを処理する
+                // テキスト全体を処理するにはポインタがnullになるまでループする必要がある
+                while (true)
+                {
+                    // IPA音素に変換
+                    IntPtr resultPtr = EspeakNative.espeak_TextToPhonemes(
+                        ref pointerToText,
+                        EspeakNative.CHARS_AUTO,
+                        EspeakNative.PHONEMES_IPA
+                    );
 
-                if (resultPtr == IntPtr.Zero)
+                    if (resultPtr == IntPtr.Zero)
+                    {
+                        // 処理するテキストがなくなった
+                        break;
+                    }
+
+                    string phonemeChunk = PtrToUtf8String(resultPtr);
+                    if (string.IsNullOrEmpty(phonemeChunk))
+                    {
+                        break;
+                    }
+
+                    allPhonemes.Append(phonemeChunk);
+
+                    // pointerToTextが更新されてnull終端に達したかチェック
+                    if (pointerToText == IntPtr.Zero)
+                    {
+                        break;
+                    }
+
+                    // テキストの終端（null文字）に達したかチェック
+                    byte nextByte = Marshal.ReadByte(pointerToText);
+                    if (nextByte == 0)
+                    {
+                        break;
+                    }
+                }
+
+                if (allPhonemes.Length == 0)
                 {
                     Debug.LogWarning($"[EspeakTokenizer] Failed to phonemize text: '{text}'");
                     return string.Empty;
                 }
 
-                return PtrToUtf8String(resultPtr);
+                return allPhonemes.ToString();
             }
             finally
             {
@@ -181,25 +214,59 @@ namespace uZipVoice.Tokenizer
 
         /// <summary>
         /// テキストをトークンID列に変換
+        /// NOTE: Python側と同じく、BOS/EOSトークンは追加しない
+        /// NOTE: espeak_TextToPhonemes は句読点を出力しないため、
+        ///       元テキストから句読点を抽出してトークンに追加する（piper_phonemize互換）
         /// </summary>
         /// <param name="text">入力テキスト</param>
-        /// <returns>トークンID配列（BOS, 音素ID..., EOS）</returns>
+        /// <returns>トークンID配列</returns>
         public int[] Tokenize(string text)
         {
             ThrowIfNotInitialized();
 
             if (string.IsNullOrEmpty(text))
             {
-                // 空の場合はBOS, EOSのみ
-                return new[] { _tokenMap.BosId, _tokenMap.EosId };
+                // 空の場合は空配列
+                return Array.Empty<int>();
             }
 
             string phonemes = TextToPhonemes(text);
-            return PhonemeStringToTokens(phonemes);
+            var tokens = new List<int>(PhonemeStringToTokens(phonemes));
+
+            // piper_phonemize互換: 元テキストの末尾句読点をトークンに追加
+            // espeak_TextToPhonemes は句読点を音素に変換しないため、手動で追加
+            if (text.Length > 0)
+            {
+                char lastChar = text[text.Length - 1];
+                // 句読点文字かどうかを確認
+                if (IsPunctuation(lastChar))
+                {
+                    int punctuationToken = _tokenMap.GetTokenIdOrDefault(lastChar.ToString(), -1);
+                    if (punctuationToken >= 0)
+                    {
+                        tokens.Add(punctuationToken);
+                        Debug.Log($"[EspeakTokenizer] Added trailing punctuation '{lastChar}' as token {punctuationToken}");
+                    }
+                }
+            }
+
+            return tokens.ToArray();
+        }
+
+        /// <summary>
+        /// 文字が句読点かどうかを判定
+        /// </summary>
+        private static bool IsPunctuation(char c)
+        {
+            // Python piper_phonemize が保持する句読点
+            return c == '.' || c == ',' || c == '!' || c == '?' ||
+                   c == ';' || c == ':' || c == '-' || c == '\'';
         }
 
         /// <summary>
         /// 音素文字列をトークンID列に変換
+        /// NOTE: Python側のEspeakTokenizerはBOS/EOSトークンを追加しないため、
+        ///       Unity側でも追加しない（ONNXモデルとの互換性のため）
         /// </summary>
         /// <param name="phonemes">IPA音素文字列</param>
         /// <returns>トークンID配列</returns>
@@ -207,10 +274,11 @@ namespace uZipVoice.Tokenizer
         {
             if (string.IsNullOrEmpty(phonemes))
             {
-                return new[] { _tokenMap.BosId, _tokenMap.EosId };
+                return Array.Empty<int>();
             }
 
-            var tokens = new List<int> { _tokenMap.BosId };
+            var tokens = new List<int>();
+            var skippedPhonemes = new List<string>();
 
             // 各文字を音素として処理
             foreach (char c in phonemes)
@@ -224,11 +292,19 @@ namespace uZipVoice.Tokenizer
                 }
                 else
                 {
-                    // 未知の音素はスキップ（警告は出さない、頻繁に発生するため）
+                    // 未知の音素を記録
+                    skippedPhonemes.Add($"'{phoneme}'(U+{((int)c):X4})");
                 }
             }
 
-            tokens.Add(_tokenMap.EosId);
+            // スキップされた音素があればログに出力
+            if (skippedPhonemes.Count > 0)
+            {
+                Debug.LogWarning($"[EspeakTokenizer] Skipped {skippedPhonemes.Count} unknown phonemes: {string.Join(", ", skippedPhonemes)}. Phonemes string: \"{phonemes}\"");
+            }
+
+            Debug.Log($"[EspeakTokenizer] Tokenized: phonemes={phonemes.Length} chars, tokens={tokens.Count}");
+
             return tokens.ToArray();
         }
 

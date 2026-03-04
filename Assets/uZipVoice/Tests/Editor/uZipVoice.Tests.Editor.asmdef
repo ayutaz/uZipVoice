@@ -5,7 +5,9 @@
         "uZipVoice.Runtime",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner",
-        "Unity.InferenceEngine"
+        "Unity.InferenceEngine",
+        "DotNetG2P.Core",
+        "DotNetG2P.MeCab"
     ],
     "includePlatforms": [
         "Editor"

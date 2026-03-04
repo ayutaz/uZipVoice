@@ -3,7 +3,9 @@
     "rootNamespace": "uZipVoice",
     "references": [
         "Unity.InferenceEngine",
-        "UniTask"
+        "UniTask",
+        "DotNetG2P.Core",
+        "DotNetG2P.MeCab"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

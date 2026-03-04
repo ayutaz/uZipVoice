@@ -35,6 +35,68 @@ namespace uZipVoice.Tests
         }
 
         /// <summary>
+        /// テスト用のtokens.txt（日本語音素含む）を生成
+        /// </summary>
+        public static string CreateTestTokensContentWithJapanese()
+        {
+            var sb = new StringBuilder();
+            // 基本トークン
+            sb.AppendLine("_\t0");   // PAD
+            sb.AppendLine("^\t1");   // BOS
+            sb.AppendLine("$\t2");   // EOS
+            sb.AppendLine(" \t3");   // SPACE
+            sb.AppendLine("!\t4");
+            sb.AppendLine(".\t10");
+            sb.AppendLine(",\t11");
+            // 英語IPA音素（一部）
+            sb.AppendLine("a\t14");
+            sb.AppendLine("d\t17");
+            sb.AppendLine("h\t20");
+            sb.AppendLine("i\t21");
+            sb.AppendLine("k\t23");
+            sb.AppendLine("l\t24");
+            sb.AppendLine("m\t25");
+            sb.AppendLine("n\t26");
+            sb.AppendLine("o\t27");
+            sb.AppendLine("p\t28");
+            sb.AppendLine("r\t29");
+            sb.AppendLine("s\t30");
+            sb.AppendLine("t\t31");
+            sb.AppendLine("u\t32");
+            sb.AppendLine("w\t35");
+            sb.AppendLine("y\t36");
+            sb.AppendLine("z\t37");
+            // 日本語音素
+            sb.AppendLine("A\t360");
+            sb.AppendLine("E\t361");
+            sb.AppendLine("I\t362");
+            sb.AppendLine("N\t363");
+            sb.AppendLine("O\t364");
+            sb.AppendLine("U\t365");
+            sb.AppendLine("by\t366");
+            sb.AppendLine("ch\t367");
+            sb.AppendLine("cl\t368");
+            sb.AppendLine("dy\t369");
+            sb.AppendLine("dz\t370");
+            sb.AppendLine("gw\t371");
+            sb.AppendLine("gy\t372");
+            sb.AppendLine("hy\t373");
+            sb.AppendLine("kw\t374");
+            sb.AppendLine("ky\t375");
+            sb.AppendLine("my\t376");
+            sb.AppendLine("ny\t377");
+            sb.AppendLine("pau\t378");
+            sb.AppendLine("py\t379");
+            sb.AppendLine("ry\t380");
+            sb.AppendLine("sh\t381");
+            sb.AppendLine("sil\t382");
+            sb.AppendLine("ts\t383");
+            sb.AppendLine("ty\t384");
+            sb.AppendLine("[H]\t385");
+            return sb.ToString();
+        }
+
+        /// <summary>
         /// テスト用の一時ファイルを作成
         /// </summary>
         public static string CreateTempFile(string content)

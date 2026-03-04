@@ -39,6 +39,9 @@ namespace uZipVoice.Core
         public float Speed = 1.0f;
 
         [Header("Tokenizer Settings")]
+        [Tooltip("使用言語")]
+        public Language Language = Language.English;
+
         [Tooltip("espeak-ng音声")]
         public string Voice = "en-us";
     }

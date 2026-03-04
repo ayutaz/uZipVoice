@@ -38,7 +38,9 @@ namespace uZipVoice.Core
 
         // コンポーネント
         private TokenMap _tokenMap;
-        private EspeakTokenizer _tokenizer;
+        private ITokenizer _tokenizer;
+        private EspeakTokenizer _espeakTokenizer;
+        private DotNetG2PTokenizer _g2pTokenizer;
         private TextEncoder _textEncoder;
         private FMDecoder _fmDecoder;
         private Vocos _vocos;
@@ -61,6 +63,40 @@ namespace uZipVoice.Core
         /// 処理中かどうか
         /// </summary>
         public bool IsProcessing => _isProcessing;
+
+        /// <summary>
+        /// 言語を切り替え
+        /// </summary>
+        /// <param name="language">切り替え先言語</param>
+        public void SetLanguage(Language language)
+        {
+            if (!_isInitialized)
+                throw new InvalidOperationException("ZipVoiceManager is not initialized. Call InitializeAsync() first.");
+
+            if (language == Language.Japanese)
+            {
+                if (_g2pTokenizer == null)
+                {
+                    _g2pTokenizer = new DotNetG2PTokenizer(_tokenMap);
+                    string dictPath = Path.Combine(Application.streamingAssetsPath, "naist-jdic");
+                    _g2pTokenizer.Initialize(dictPath);
+                }
+                _tokenizer = _g2pTokenizer;
+            }
+            else
+            {
+                if (_espeakTokenizer == null)
+                {
+                    _espeakTokenizer = new EspeakTokenizer(_tokenMap);
+                    string voice = Config != null ? Config.Voice : "en-us";
+                    _espeakTokenizer.Voice = voice;
+                    string espeakDataPath = Path.Combine(Application.streamingAssetsPath, "espeak-ng-data");
+                    _espeakTokenizer.Initialize(espeakDataPath);
+                }
+                _tokenizer = _espeakTokenizer;
+            }
+            Debug.Log($"[ZipVoiceManager] Language set to {language}");
+        }
 
         /// <summary>
         /// 初期化
@@ -97,18 +133,31 @@ namespace uZipVoice.Core
                 }
 
                 // Tokenizerを初期化
-                _tokenizer = new EspeakTokenizer(_tokenMap);
-                _tokenizer.Voice = voice;
+                Language language = Config != null ? Config.Language : Language.English;
 
-                string espeakDataPath = Path.Combine(Application.streamingAssetsPath, "espeak-ng-data");
-                if (Directory.Exists(espeakDataPath))
+                if (language == Language.Japanese)
                 {
-                    _tokenizer.Initialize(espeakDataPath);
-                    Debug.Log("[ZipVoiceManager] EspeakTokenizer initialized");
+                    _g2pTokenizer = new DotNetG2PTokenizer(_tokenMap);
+                    string dictPath = Path.Combine(Application.streamingAssetsPath, "naist-jdic");
+                    _g2pTokenizer.Initialize(dictPath);
+                    _tokenizer = _g2pTokenizer;
+                    Debug.Log("[ZipVoiceManager] DotNetG2PTokenizer initialized");
                 }
                 else
                 {
-                    Debug.LogWarning($"[ZipVoiceManager] espeak-ng-data not found at {espeakDataPath}");
+                    _espeakTokenizer = new EspeakTokenizer(_tokenMap);
+                    _espeakTokenizer.Voice = voice;
+                    string espeakDataPath = Path.Combine(Application.streamingAssetsPath, "espeak-ng-data");
+                    if (Directory.Exists(espeakDataPath))
+                    {
+                        _espeakTokenizer.Initialize(espeakDataPath);
+                        Debug.Log("[ZipVoiceManager] EspeakTokenizer initialized");
+                    }
+                    else
+                    {
+                        Debug.LogWarning($"[ZipVoiceManager] espeak-ng-data not found at {espeakDataPath}");
+                    }
+                    _tokenizer = _espeakTokenizer;
                 }
 
                 // TextEncoderを初期化
@@ -374,12 +423,15 @@ namespace uZipVoice.Core
                 return;
             }
 
-            _tokenizer?.Dispose();
+            _espeakTokenizer?.Dispose();
+            _g2pTokenizer?.Dispose();
             _textEncoder?.Dispose();
             _fmDecoder?.Dispose();
             _vocos?.Dispose();
 
             _tokenizer = null;
+            _espeakTokenizer = null;
+            _g2pTokenizer = null;
             _textEncoder = null;
             _fmDecoder = null;
             _vocos = null;

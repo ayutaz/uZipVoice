@@ -139,7 +139,7 @@ FMDecoder includes several optimizations for faster synthesis:
 
 ### Performance Tips
 
-- **NumSteps**: Lower values (4-8) are faster but may reduce quality. Higher values (16-32) provide better quality.
+- **NumSteps**: Lower values (4-8) are faster but may reduce quality. Higher values (up to 16) provide better quality. The distilled model recommends 4-8.
 - **Backend**: Use `GPUCompute` for best performance on supported hardware.
 - **Batch Size**: Process single utterances for lowest latency.
 
@@ -153,7 +153,7 @@ FMDecoder includes several optimizations for faster synthesis:
 | NFft | 1024 | FFT size |
 | HopLength | 256 | Hop length for STFT |
 | NMels | 100 | Number of mel bands |
-| NumSteps | 16 | Euler solver steps (4-32) |
+| NumSteps | 8 | Euler solver steps (4-16) |
 | TShift | 0.5 | Time shift parameter |
 | GuidanceScale | 1.0 | CFG scale (0-3) |
 | Speed | 1.0 | Speech speed (0.5-2.0) |
@@ -185,9 +185,13 @@ Assets/uZipVoice/
 │   └── TTSSampleController.cs
 ├── Tests/
 │   ├── Editor/
+│   │   ├── EspeakTokenizerTests.cs
 │   │   ├── EulerSolverTests.cs
-│   │   ├── TokenMapTests.cs
-│   │   └── EspeakTokenizerTests.cs
+│   │   ├── FeatureExtractorTests.cs
+│   │   ├── ISTFTProcessorTests.cs
+│   │   ├── TensorShapeTests.cs
+│   │   ├── TestUtility.cs
+│   │   └── TokenMapTests.cs
 │   └── Runtime/
 ├── Models/
 │   ├── text_encoder.onnx
@@ -203,14 +207,16 @@ Assets/uZipVoice/
 
 ## Testing
 
-The project includes 97 unit tests:
+The project includes 136 EditMode unit tests:
 
 | Test Class | Tests | Description |
 |------------|-------|-------------|
-| TokenMapTests | 24 | Token mapping validation |
-| EulerSolverTests | 32 | ODE solver validation |
-| EspeakTokenizerTests | 19 | G2P conversion tests |
+| TokenMapTests | 28 | Token mapping validation |
+| EulerSolverTests | 28 | ODE solver validation |
+| EspeakTokenizerTests | 22 | G2P conversion tests |
 | TensorShapeTests | 22 | ONNX tensor shape validation |
+| FeatureExtractorTests | 16 | Mel feature extraction validation |
+| ISTFTProcessorTests | 20 | ISTFT (NWaves) validation |
 
 Run tests via Unity Test Runner (Window > General > Test Runner).
 

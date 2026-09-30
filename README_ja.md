@@ -139,7 +139,7 @@ FMDecoderには高速合成のための最適化が含まれています:
 
 ### パフォーマンスのヒント
 
-- **NumSteps**: 低い値（4-8）は高速だが品質が下がる可能性あり。高い値（16-32）で品質向上。
+- **NumSteps**: 低い値（4-8）は高速だが品質が下がる可能性あり。高い値（最大16）で品質向上。蒸留モデルでは4-8を推奨。
 - **Backend**: 対応ハードウェアでは`GPUCompute`を使用して最高性能を発揮。
 - **バッチサイズ**: 最小レイテンシには単一発話を処理。
 
@@ -153,7 +153,7 @@ FMDecoderには高速合成のための最適化が含まれています:
 | NFft | 1024 | FFTサイズ |
 | HopLength | 256 | STFTのホップ長 |
 | NMels | 100 | メルバンド数 |
-| NumSteps | 16 | Eulerソルバステップ数（4-32） |
+| NumSteps | 8 | Eulerソルバステップ数（4-16） |
 | TShift | 0.5 | タイムシフトパラメータ |
 | GuidanceScale | 1.0 | CFGスケール（0-3） |
 | Speed | 1.0 | 発話速度（0.5-2.0） |
@@ -185,9 +185,13 @@ Assets/uZipVoice/
 │   └── TTSSampleController.cs
 ├── Tests/
 │   ├── Editor/
+│   │   ├── EspeakTokenizerTests.cs
 │   │   ├── EulerSolverTests.cs
-│   │   ├── TokenMapTests.cs
-│   │   └── EspeakTokenizerTests.cs
+│   │   ├── FeatureExtractorTests.cs
+│   │   ├── ISTFTProcessorTests.cs
+│   │   ├── TensorShapeTests.cs
+│   │   ├── TestUtility.cs
+│   │   └── TokenMapTests.cs
 │   └── Runtime/
 ├── Models/
 │   ├── text_encoder.onnx
@@ -203,14 +207,16 @@ Assets/uZipVoice/
 
 ## テスト
 
-プロジェクトには97のユニットテストが含まれています:
+プロジェクトには136のEditModeユニットテストが含まれています:
 
 | テストクラス | テスト数 | 説明 |
 |------------|---------|------|
-| TokenMapTests | 24 | トークンマッピング検証 |
-| EulerSolverTests | 32 | ODEソルバ検証 |
-| EspeakTokenizerTests | 19 | G2P変換テスト |
+| TokenMapTests | 28 | トークンマッピング検証 |
+| EulerSolverTests | 28 | ODEソルバ検証 |
+| EspeakTokenizerTests | 22 | G2P変換テスト |
 | TensorShapeTests | 22 | ONNXテンソル形状検証 |
+| FeatureExtractorTests | 16 | メル特徴量抽出検証 |
+| ISTFTProcessorTests | 20 | ISTFT（NWaves）検証 |
 
 テストはUnity Test Runner（Window > General > Test Runner）から実行できます。
 

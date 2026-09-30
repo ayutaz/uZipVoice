@@ -139,7 +139,7 @@ FMDecoder包含多项快速合成优化:
 
 ### 性能提示
 
-- **NumSteps**: 较低值（4-8）更快但可能降低质量。较高值（16-32）提供更好质量。
+- **NumSteps**: 较低值（4-8）更快但可能降低质量。较高值（最高16）提供更好质量。蒸馏模型推荐4-8。
 - **Backend**: 在支持的硬件上使用`GPUCompute`获得最佳性能。
 - **批量大小**: 处理单个语句以获得最低延迟。
 
@@ -153,7 +153,7 @@ FMDecoder包含多项快速合成优化:
 | NFft | 1024 | FFT大小 |
 | HopLength | 256 | STFT的跳跃长度 |
 | NMels | 100 | 梅尔频带数 |
-| NumSteps | 16 | Euler求解器步数（4-32） |
+| NumSteps | 8 | Euler求解器步数（4-16） |
 | TShift | 0.5 | 时间偏移参数 |
 | GuidanceScale | 1.0 | CFG比例（0-3） |
 | Speed | 1.0 | 语速（0.5-2.0） |
@@ -185,9 +185,13 @@ Assets/uZipVoice/
 │   └── TTSSampleController.cs
 ├── Tests/
 │   ├── Editor/
+│   │   ├── EspeakTokenizerTests.cs
 │   │   ├── EulerSolverTests.cs
-│   │   ├── TokenMapTests.cs
-│   │   └── EspeakTokenizerTests.cs
+│   │   ├── FeatureExtractorTests.cs
+│   │   ├── ISTFTProcessorTests.cs
+│   │   ├── TensorShapeTests.cs
+│   │   ├── TestUtility.cs
+│   │   └── TokenMapTests.cs
 │   └── Runtime/
 ├── Models/
 │   ├── text_encoder.onnx
@@ -203,14 +207,16 @@ Assets/uZipVoice/
 
 ## 测试
 
-项目包含97个单元测试:
+项目包含136个EditMode单元测试:
 
 | 测试类 | 测试数 | 描述 |
 |-------|-------|------|
-| TokenMapTests | 24 | Token映射验证 |
-| EulerSolverTests | 32 | ODE求解器验证 |
-| EspeakTokenizerTests | 19 | G2P转换测试 |
+| TokenMapTests | 28 | Token映射验证 |
+| EulerSolverTests | 28 | ODE求解器验证 |
+| EspeakTokenizerTests | 22 | G2P转换测试 |
 | TensorShapeTests | 22 | ONNX张量形状验证 |
+| FeatureExtractorTests | 16 | Mel特征提取验证 |
+| ISTFTProcessorTests | 20 | ISTFT（NWaves）验证 |
 
 通过Unity Test Runner（Window > General > Test Runner）运行测试。
 
